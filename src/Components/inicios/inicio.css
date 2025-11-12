@@ -1,0 +1,135 @@
+:root{
+  --teal:#10b8a6;     /* verde agua / teal */
+  --teal-dark:#0e968a;
+  --ink:#0f172a;
+  --muted:#64748b;
+  --bg:#f6faf9;
+  --card:#ffffff;
+  --shadow:0 14px 36px rgba(2,8,23,.10);
+}
+
+/* ===== Topbar ===== */
+.admin-menu{
+  position: sticky; top:0; z-index:50;
+  display:flex; align-items:center; justify-content:space-between;
+  gap:16px;
+  padding:10px 18px;
+  background: linear-gradient(90deg, var(--teal) 0%, #11c5b1 100%);
+  color:#fff;
+  box-shadow: var(--shadow);
+}
+.admin-left{ display:flex; align-items:center; gap:18px }
+.admin-logo{
+  display:flex; align-items:center; gap:10px; font-weight:800; letter-spacing:.3px;
+}
+.logo-badge{
+  display:inline-grid; place-items:center;
+  width:28px; height:28px; border-radius:999px; background:rgba(255,255,255,.2);
+  font-size:16px;
+}
+
+.admin-nav{ display:flex; gap:16px; align-items:center }
+.admin-link{ color:#fff; text-decoration:none; font-weight:600; opacity:.95 }
+.admin-link:hover{ opacity:1; text-decoration:underline }
+
+.admin-dropdown{ position:relative }
+.admin-dropdown-content{
+  position:absolute; top:34px; left:0;
+  background:#fff; color:#111; border-radius:10px; min-width:180px;
+  box-shadow: var(--shadow); padding:8px 0; display:none;
+}
+.admin-dropdown:hover .admin-dropdown-content{ display:block }
+.admin-sublink{
+  display:block; padding:8px 12px; text-decoration:none; color:#0f172a; font-weight:600;
+}
+.admin-sublink:hover{ background:#f1f5f9 }
+
+.admin-right .admin-tag{
+  background: rgba(255,255,255,.2);
+  border:1px solid rgba(255,255,255,.35);
+  padding:6px 10px; border-radius:999px; font-size:12px;
+}
+
+/* ===== Hero ===== */
+.inicio-hero.modern{
+  display:flex; gap:28px; align-items:stretch; justify-content:space-between;
+  padding:48px 10%;
+  background:
+    radial-gradient(1100px 500px at 10% -10%, rgba(16,184,166,.18), transparent 60%),
+    radial-gradient(900px 480px at 110% 20%, rgba(16,184,166,.12), transparent 60%),
+    var(--bg);
+}
+.inicio-texto{ flex: 1 1 520px; }
+.inicio-title{
+  font-size: clamp(28px, 4vw, 40px);
+  margin:0 0 10px 0;
+  color:var(--ink);
+}
+.inicio-lead{
+  color:var(--muted);
+  font-size: clamp(16px, 1.5vw, 18px);
+  line-height:1.6;
+  margin-bottom:18px;
+}
+.hero-actions{ display:flex; gap:12px; margin: 16px 0 10px }
+.btn-cta{
+  background: var(--teal); color:#fff; border:none;
+  padding:12px 16px; border-radius:12px; font-weight:700; text-decoration:none;
+  box-shadow: var(--shadow);
+}
+.btn-cta:hover{ background: var(--teal-dark) }
+.btn-ghost{
+  color:var(--teal); text-decoration:none;
+  padding:12px 16px; border-radius:12px; font-weight:700;
+  border:1px solid var(--teal);
+  background: transparent;
+}
+.btn-ghost:hover{ background: rgba(16,184,166,.06) }
+
+.hero-points{ margin:14px 0 0; padding:0; list-style:none; color:#0b4e47; display:grid; gap:6px }
+
+.inicio-card.pretty{
+  position:relative;
+  flex: 0 0 420px;
+  background:#e2f7f3; border-radius:18px; overflow:hidden;
+  box-shadow: var(--shadow);
+}
+.inicio-card.pretty img{
+  width:100%; height:100%; object-fit:cover; display:block;
+  min-height: 300px;
+}
+.card-sticker{
+  position:absolute; bottom:14px; left:14px;
+  background:#fff; border-radius:14px; padding:8px 12px;
+  display:flex; align-items:center; gap:8px;
+  box-shadow: var(--shadow);
+}
+.pill-icon{ font-size:18px }
+.sticker-text{ font-weight:800; color:var(--teal-dark) }
+
+/* ===== Módulos ===== */
+.modules{
+  padding: 0 10% 40px;
+  display:grid; gap:18px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+.module-card{
+  background:#fff; border:1px solid #e6eef0; border-radius:16px; padding:16px;
+  box-shadow: var(--shadow);
+  transition: transform .08s ease;
+}
+.module-card:hover{ transform: translateY(-2px) }
+.module-icon{
+  width:42px; height:42px; border-radius:10px;
+  display:grid; place-items:center;
+  background: rgba(16,184,166,.12);
+  color:#0b4e47; font-size:22px; margin-bottom:8px;
+}
+.module-card h3{ margin:6px 0 6px; color:var(--ink) }
+.module-card p{ color:var(--muted); margin:0 0 12px }
+.module-actions{ display:flex; gap:8px; flex-wrap:wrap }
+.chip{
+  padding:8px 10px; border-radius:999px; border:1px solid #d6e7e6;
+  background:#f7fffe; color:#0b4e47; font-weight:700; text-decoration:none;
+}
+.chip[disabled]{ opacity:.5; cursor:not-allowed }

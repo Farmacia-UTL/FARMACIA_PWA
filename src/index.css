@@ -1,0 +1,12 @@
+/* Asegura que html y body ocupen toda la altura de la pantalla */
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: 'Arial', sans-serif;
+}
+
+/* Asegura que el contenedor root también ocupe toda la altura */
+#root {
+  height: 100%;
+}

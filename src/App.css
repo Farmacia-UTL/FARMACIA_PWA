@@ -1,0 +1,6 @@
+/* Asegurarse de que el body ocupe el 100% de la altura */
+body, html {
+  height: 100%;
+  margin: 0;
+  font-family: 'Arial', sans-serif;
+}
