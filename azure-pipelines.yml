@@ -1,0 +1,132 @@
+# =====================================================
+# 📦 Pipeline CI/CD para App Flask (SGT)
+# Flujo: CI (Empaquetado) -> CD (Deploy a Azure WebApp)
+# Solución FINAL para pyodbc y errores de copia de archivos
+# =====================================================
+
+trigger:
+- main
+
+pool:
+  name: 'AgenteLocal'
+
+variables:
+  AppSourceDir: '$(Build.SourcesDirectory)/sgt'
+  ArtifactName: 'sgt-deploy-package'
+  DeploymentPath: '$(Build.ArtifactStagingDirectory)/$(ArtifactName)'
+  ServiceConnectionName: 'AZ-Conexion-SGT'
+  AppServiceName: 'sgt-app-integrated-2025'
+  PythonVersion: '3.11' # ✅ Versión centralizada
+
+
+# =====================================================
+# 1️⃣ Etapa: CI - Integración Continua (Empaquetado)
+# =====================================================
+stages:
+- stage: CI_Build
+  displayName: 'Etapa 1: Integración Continua (Empaquetado)'
+  jobs:
+  - job: PythonCI
+    displayName: 'Job: Instalación y Empaquetado'
+    steps:
+
+    # --- 0. Limpiar workspace ---
+    - script: |
+        echo "🧹 Limpiando directorio de trabajo previo..."
+        git clean -xfd
+        echo "Verificando contenido actual de requirements.txt:"
+        type requirements.txt
+      displayName: 'Limpiar workspace y mostrar requirements.txt'
+
+    # --- 1. Configurar versión de Python ---
+    - task: UsePythonVersion@0
+      displayName: 'Configurar Python $(PythonVersion)'
+      inputs:
+        versionSpec: '$(PythonVersion)'
+
+    # --- 2. Instalar dependencias ---
+    - script: |
+        echo "📦 Instalando dependencias..."
+        pip install --upgrade pip
+        pip install -r requirements.txt || (echo "Reintentando instalación..." && pip install -r requirements.txt)
+      displayName: 'Instalar Flask y dependencias'
+
+    # ✅ Crea el directorio de artefactos ANTES de copiar archivos
+    - script: |
+        # Esto soluciona el error "Not found PathtoPublish"
+        mkdir -p "$(DeploymentPath)"
+        echo "Directorio de despliegue creado: $(DeploymentPath)"
+      displayName: 'Crear Directorio de Artefactos'
+
+    # --- 3. Copiar archivos para despliegue ---
+    - task: CopyFiles@2
+      displayName: 'Copiar Código de Aplicación'
+      inputs:
+        SourceFolder: '$(Build.SourcesDirectory)'
+        Contents: |
+          sgt/** # Tu código fuente, incluyendo main.py
+          requirements.txt     # CRÍTICO: Para instalar dependencias en Azure
+          templates/** # CRÍTICO: Templates en la raíz
+          start.sh # 🛠️ Nuevo script de inicio
+        TargetFolder: '$(DeploymentPath)'
+
+    # --- 4. Publicar artefactos ---
+    - task: PublishPipelineArtifact@1 
+      displayName: 'Publicar Artefacto de Despliegue'
+      inputs:
+        targetPath: '$(DeploymentPath)' 
+        artifact: '$(ArtifactName)'     
+
+
+# =====================================================
+# 2️⃣ Etapa: CD - Despliegue Continuo en Azure
+# =====================================================
+- stage: CD_Deployment
+  displayName: 'Etapa 2: Despliegue en Azure App Service'
+  dependsOn: CI_Build
+  condition: succeeded()
+  
+  jobs:
+  - deployment: DeployToAzure
+    displayName: 'Job: Desplegar Flask App en Azure'
+    environment: 'Entorno-Integrado-SGT'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: DownloadPipelineArtifact@2
+            displayName: 'Descargar Artefacto de Código Empaquetado'
+            inputs:
+              artifactName: '$(ArtifactName)'
+              downloadPath: '$(Pipeline.Workspace)/$(ArtifactName)'
+
+          - task: AzureWebApp@1
+            displayName: 'Desplegar Flask App a Azure App Service'
+            inputs:
+              azureSubscription: '$(ServiceConnectionName)'
+              appName: '$(AppServiceName)'
+              appType: webApp
+              # 🛑 CORRECCIÓN FINAL DE COPIA: Forzar la raíz del artefacto como paquete
+              package: '$(Pipeline.Workspace)/$(ArtifactName)' 
+              # 🛠️ Ejecuta el script de shell que instala el driver ODBC y luego Gunicorn.
+              startupCommand: 'start.sh'
+
+
+# =====================================================
+# 3️⃣ Etapa: Test Funcional Post-Deploy (Opcional)
+# =====================================================
+- stage: Functional_Tests
+  displayName: "Etapa 3: Verificacion Post Despliegue (opcional)"
+  dependsOn: CD_Deployment
+  condition: succeeded()
+  
+  jobs:
+  - job: FunctionalTest
+    displayName: "Job: Verificacion del Despliegue (externa)"
+    pool:
+      name: "AgenteLocal"
+    steps:
+      - script: |
+          echo "Despliegue completado correctamente."
+          echo "La verificacion funcional sera realizada con una herramienta externa."
+        displayName: "Notificacion de exito"
