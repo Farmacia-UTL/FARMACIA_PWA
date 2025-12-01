@@ -1,7 +1,6 @@
 # =====================================================
-# 📦 Pipeline CI/CD para App Flask (SGT)
-# Flujo: CI (Empaquetado) -> CD (Deploy a Azure WebApp)
-# Solución FINAL para pyodbc y errores de copia de archivos
+# 📦 Pipeline CI para App Flask (SGT) - Solo Build
+# Flujo: CI (Empaquetado) -> Artefacto listo
 # =====================================================
 
 trigger:
@@ -14,10 +13,11 @@ variables:
   AppSourceDir: '$(Build.SourcesDirectory)/sgt'
   ArtifactName: 'sgt-deploy-package'
   DeploymentPath: '$(Build.ArtifactStagingDirectory)/$(ArtifactName)'
-  ServiceConnectionName: 'AZ-Conexion-SGT'
-  AppServiceName: 'sgt-app-integrated-2025'
+  # ServiceConnectionName y AppServiceName ya no son necesarios sin deploy, 
+  # pero los dejo comentados por si los re-activas en el futuro.
+  # ServiceConnectionName: 'AZ-Conexion-SGT'
+  # AppServiceName: 'sgt-app-integrated-2025'
   PythonVersion: '3.11' # ✅ Versión centralizada
-
 
 # =====================================================
 # 1️⃣ Etapa: CI - Integración Continua (Empaquetado)
@@ -75,58 +75,4 @@ stages:
       displayName: 'Publicar Artefacto de Despliegue'
       inputs:
         targetPath: '$(DeploymentPath)' 
-        artifact: '$(ArtifactName)'     
-
-
-# =====================================================
-# 2️⃣ Etapa: CD - Despliegue Continuo en Azure
-# =====================================================
-- stage: CD_Deployment
-  displayName: 'Etapa 2: Despliegue en Azure App Service'
-  dependsOn: CI_Build
-  condition: succeeded()
-  
-  jobs:
-  - deployment: DeployToAzure
-    displayName: 'Job: Desplegar Flask App en Azure'
-    environment: 'Entorno-Integrado-SGT'
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - task: DownloadPipelineArtifact@2
-            displayName: 'Descargar Artefacto de Código Empaquetado'
-            inputs:
-              artifactName: '$(ArtifactName)'
-              downloadPath: '$(Pipeline.Workspace)/$(ArtifactName)'
-
-          - task: AzureWebApp@1
-            displayName: 'Desplegar Flask App a Azure App Service'
-            inputs:
-              azureSubscription: '$(ServiceConnectionName)'
-              appName: '$(AppServiceName)'
-              appType: webApp
-              # 🛑 CORRECCIÓN FINAL DE COPIA: Forzar la raíz del artefacto como paquete
-              package: '$(Pipeline.Workspace)/$(ArtifactName)' 
-              # 🛠️ Ejecuta el script de shell que instala el driver ODBC y luego Gunicorn.
-              startupCommand: 'start.sh'
-
-
-# =====================================================
-# 3️⃣ Etapa: Test Funcional Post-Deploy (Opcional)
-# =====================================================
-- stage: Functional_Tests
-  displayName: "Etapa 3: Verificacion Post Despliegue (opcional)"
-  dependsOn: CD_Deployment
-  condition: succeeded()
-  
-  jobs:
-  - job: FunctionalTest
-    displayName: "Job: Verificacion del Despliegue (externa)"
-    pool:
-      name: "AgenteLocal"
-    steps:
-      - script: |
-          echo "Despliegue completado correctamente."
-          echo "La verificacion funcional sera realizada con una herramienta externa."
-        displayName: "Notificacion de exito"
+        artifact: '$(ArtifactName)'
