@@ -21,6 +21,10 @@ stages:
     displayName: 'Job: Preparación CI'
     steps:
 
+    # 0. ✅ NUEVO: Descargar historial completo para poder leer commits antiguos
+    - checkout: self
+      fetchDepth: 0
+
     # 1. Limpieza
     - script: |
         echo "🧹 Limpiando workspace..."
@@ -47,8 +51,12 @@ stages:
         }
 
         Write-Host "🧾 Buscando IDs de tareas (ej. #31) en los últimos commits..."
-        # Leemos los mensajes de los últimos 15 commits
+        
+        # Leemos los mensajes de los últimos 15 commits (Ahora sí funcionará gracias a fetchDepth: 0)
         $commits = git log --pretty=format:%s HEAD~15..HEAD
+        
+        Write-Host "   -> Últimos mensajes analizados:" 
+        $commits | ForEach-Object { Write-Host "      - $_" }
         
         # Expresión regular para encontrar #NUMERO
         $regex = '#(\d+)'
@@ -81,8 +89,12 @@ stages:
 
         foreach ($id in $ids) {
             Write-Host "✔️ Cerrando Tarea #$id..."
-            # Forzamos el estado a Done
-            az boards work-item update --id $id --fields "System.State=Done" "Microsoft.VSTS.Scheduling.RemainingWork=0"
+            try {
+                # Forzamos el estado a Done
+                az boards work-item update --id $id --fields "System.State=Done" "Microsoft.VSTS.Scheduling.RemainingWork=0"
+            } catch {
+                Write-Error "❌ Error al cerrar la tarea #$id. Verifica permisos o existencia del ID."
+            }
         }
       displayName: '🤖 Cierre automático de Work Items'
       env:
