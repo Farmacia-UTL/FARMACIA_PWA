@@ -59,12 +59,18 @@ stages:
         }
 
         Write-Host "🧰 Verificando herramientas Azure CLI..."
-        try {
-          az --version | Out-Null
-        } catch {
-          Write-Warning "⚠️ Azure CLI no encontrado. Asegúrate de instalarlo en el agente."
+        
+        # ✅ NUEVA VALIDACIÓN ROBUSTA:
+        # Si 'az' no existe, terminamos el script suavemente (exit 0) para NO romper el pipeline.
+        if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
+            Write-Warning "⚠️ Azure CLI ('az') no detectado en el sistema."
+            Write-Warning "   -> Causa probable: Instalaste Azure CLI pero NO reiniciaste el agente."
+            Write-Warning "   -> Solución: Cierra y vuelve a abrir el agente 'run.cmd' o reinicia el servicio."
+            Write-Warning "⏩ Saltando el cierre automático de tareas para continuar con el Build..."
+            exit 0
         }
 
+        # Si llegamos aquí, es que 'az' existe. Continuamos.
         # Instala la extensión de devops si falta
         az extension add --name azure-devops 2>$null
 
