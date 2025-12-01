@@ -77,11 +77,10 @@ stages:
 
         Write-Host "📌 Intentando cerrar IDs: $ids"
 
-        $env:AZURE_DEVOPS_EXT_PAT = "$(System.AccessToken)"
+        # 🛑 CORRECCIÓN: Eliminamos el 'az devops login' explícito que causaba error en Windows.
+        # La autenticación se hace automática usando la variable de entorno AZURE_DEVOPS_EXT_PAT definida abajo.
         
-        # Login explícito para asegurar permisos
-        echo $env:AZURE_DEVOPS_EXT_PAT | az devops login --organization https://dev.azure.com/ProyectoIDGS1003
-
+        Write-Host "🔗 Configurando contexto de Azure DevOps..."
         az devops configure --defaults organization=https://dev.azure.com/ProyectoIDGS1003 project="3LB-Farmacia"
 
         $hasError = $false
