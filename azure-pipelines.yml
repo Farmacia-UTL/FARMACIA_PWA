@@ -1,5 +1,9 @@
+# =====================================================
+# 📦 Pipeline CI para App Flask (SGT) - Solo Build + Cierre Tareas
+# =====================================================
+
 trigger:
-  - master
+- master # O 'main', asegúrate de que coincida con tu rama principal
 
 pool:
   name: 'AgenteLocal'
@@ -11,28 +15,42 @@ variables:
 
 stages:
 - stage: CI_Build
-  displayName: 'Empaquetado + cierre de work items'
+  displayName: 'Empaquetado y Gestión'
   jobs:
   - job: PythonCI
-    displayName: 'Preparación CI'
+    displayName: 'Job: Preparación CI'
     steps:
 
+    # 1. Limpieza
     - script: |
         echo "🧹 Limpiando workspace..."
         git clean -xfd
       displayName: 'Limpiar workspace'
 
+    # 2. 🤖 Cierre automático de Tareas (Script Robusto para Windows)
     - powershell: |
         Write-Host "🔍 Detectando rama..."
         $branch = "$(Build.SourceBranchName)"
 
-        if ($branch -ne "master") {
-          Write-Host "⏩ No es master, no se cierran work items"
+        # Solo ejecutamos esto si el cambio entra a la rama principal (master/main)
+        if ($branch -ne "master" -and $branch -ne "main") {
+          Write-Host "⏩ Rama '$branch' detectada. Los Work Items solo se cierran en master/main."
           exit 0
         }
 
-        Write-Host "🧾 Buscando IDs en los commits..."
-        $commits = git log --pretty=format:%s HEAD~10..HEAD
+        # Validación de seguridad: ¿Existe el comando 'az'?
+        if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
+            Write-Warning "⚠️ El comando 'az' (Azure CLI) no se encuentra."
+            Write-Warning "   -> Por favor, cierra y vuelve a abrir el agente 'run.cmd' para recargar el PATH."
+            Write-Warning "⏩ Saltando cierre de tareas para no romper el Build..."
+            exit 0
+        }
+
+        Write-Host "🧾 Buscando IDs de tareas (ej. #31) en los últimos commits..."
+        # Leemos los mensajes de los últimos 15 commits
+        $commits = git log --pretty=format:%s HEAD~15..HEAD
+        
+        # Expresión regular para encontrar #NUMERO
         $regex = '#(\d+)'
         $ids = @()
 
@@ -41,51 +59,57 @@ stages:
                 $ids += $matches[1]
             }
         }
-
+        
+        # Quitamos duplicados
         $ids = $ids | Select-Object -Unique
 
         if ($ids.Count -eq 0) {
-            Write-Host "⚠️ No se detectaron tareas"
+            Write-Host "ℹ️ No se encontraron menciones a tareas (con #) en los commits recientes."
             exit 0
         }
 
         Write-Host "📌 IDs encontrados: $ids"
 
+        # Configuramos credenciales y conexión
         $env:AZURE_DEVOPS_EXT_PAT = "$(System.AccessToken)"
+        
+        # Intentamos instalar la extensión, si ya existe no pasa nada
+        az extension add --name azure-devops 2>$null
 
-        az extension add --name azure-devops --only-show-errors
-
-        az devops configure --defaults `
-          organization=https://dev.azure.com/ProyectoIDGS1003 `
-          project="3LB-Farmacia"
+        Write-Host "🔗 Conectando a Azure DevOps..."
+        az devops configure --defaults organization=https://dev.azure.com/ProyectoIDGS1003 project="3LB-Farmacia"
 
         foreach ($id in $ids) {
-            Write-Host "✔️ Cerrando tarea $id"
-            az boards work-item update `
-              --id $id `
-              --fields "System.State=Done" `
-                        "Microsoft.VSTS.Scheduling.RemainingWork=0"
+            Write-Host "✔️ Cerrando Tarea #$id..."
+            # Forzamos el estado a Done
+            az boards work-item update --id $id --fields "System.State=Done" "Microsoft.VSTS.Scheduling.RemainingWork=0"
         }
       displayName: '🤖 Cierre automático de Work Items'
       env:
-        System.AccessToken: $(System.AccessToken)
+        AZURE_DEVOPS_EXT_PAT: $(System.AccessToken) # Necesario para tener permiso
 
+    # 3. Configurar Python
     - task: UsePythonVersion@0
       displayName: 'Configurar Python'
       inputs:
         versionSpec: '$(PythonVersion)'
 
+    # 4. Instalar Dependencias
     - script: |
+        echo "📦 Instalando dependencias..."
         pip install --upgrade pip
         pip install -r requirements.txt
       displayName: 'Instalar dependencias'
 
+    # 5. Crear Artefacto
     - script: |
         mkdir "$(DeploymentPath)"
+        echo "📂 Carpeta creada: $(DeploymentPath)"
       displayName: 'Crear carpeta de artefactos'
 
+    # 6. Copiar Archivos
     - task: CopyFiles@2
-      displayName: 'Copiar archivos'
+      displayName: 'Copiar archivos al paquete'
       inputs:
         SourceFolder: '$(Build.SourcesDirectory)'
         Contents: |
@@ -95,6 +119,7 @@ stages:
           start.sh
         TargetFolder: '$(DeploymentPath)'
 
+    # 7. Publicar
     - task: PublishPipelineArtifact@1
       displayName: 'Publicar Artefacto'
       inputs:
