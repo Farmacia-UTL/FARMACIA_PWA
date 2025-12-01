@@ -3,7 +3,7 @@
 # =====================================================
 
 trigger:
-- master # O 'main', asegúrate de que coincida con tu rama principal
+- master # O 'main'
 
 pool:
   name: 'AgenteLocal'
@@ -21,7 +21,7 @@ stages:
     displayName: 'Job: Preparación CI'
     steps:
 
-    # 0. ✅ NUEVO: Descargar historial completo para poder leer commits antiguos
+    # 0. ✅ Descargar historial completo
     - checkout: self
       fetchDepth: 0
 
@@ -31,74 +31,89 @@ stages:
         git clean -xfd
       displayName: 'Limpiar workspace'
 
-    # 2. 🤖 Cierre automático de Tareas (Script Robusto para Windows)
+    # 2. 🤖 Cierre automático de Tareas (Script Depurado)
     - powershell: |
-        Write-Host "🔍 Detectando rama..."
+        Write-Host "🔍 INICIANDO DIAGNÓSTICO..."
         $branch = "$(Build.SourceBranchName)"
+        Write-Host "   -> Rama detectada: $branch"
 
-        # Solo ejecutamos esto si el cambio entra a la rama principal (master/main)
         if ($branch -ne "master" -and $branch -ne "main") {
-          Write-Host "⏩ Rama '$branch' detectada. Los Work Items solo se cierran en master/main."
+          Write-Host "⏩ No estamos en master/main. Saltando."
           exit 0
         }
 
         # Validación de seguridad: ¿Existe el comando 'az'?
         if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
-            Write-Warning "⚠️ El comando 'az' (Azure CLI) no se encuentra."
-            Write-Warning "   -> Por favor, cierra y vuelve a abrir el agente 'run.cmd' para recargar el PATH."
-            Write-Warning "⏩ Saltando cierre de tareas para no romper el Build..."
+            Write-Warning "⚠️ El comando 'az' no funciona. Reinicia el agente."
             exit 0
         }
 
-        Write-Host "🧾 Buscando IDs de tareas (ej. #31) en los últimos commits..."
+        Write-Host "🧾 Leyendo últimos 15 commits..."
+        # Usamos -n 15 para evitar errores si hay pocos commits
+        $commits = git log -n 15 --pretty=format:%s
         
-        # Leemos los mensajes de los últimos 15 commits (Ahora sí funcionará gracias a fetchDepth: 0)
-        $commits = git log --pretty=format:%s HEAD~15..HEAD
+        Write-Host "--------------------------------"
+        Write-Host "   MENSAJES ENCONTRADOS:"
+        $commits | ForEach-Object { Write-Host "   * $_" }
+        Write-Host "--------------------------------"
         
-        Write-Host "   -> Últimos mensajes analizados:" 
-        $commits | ForEach-Object { Write-Host "      - $_" }
-        
-        # Expresión regular para encontrar #NUMERO
         $regex = '#(\d+)'
         $ids = @()
 
         foreach ($line in $commits) {
             if ($line -match $regex) {
-                $ids += $matches[1]
+                $id = $matches[1]
+                Write-Host "   -> ¡Detectado ID #$id en el mensaje!"
+                $ids += $id
             }
         }
         
-        # Quitamos duplicados
         $ids = $ids | Select-Object -Unique
 
         if ($ids.Count -eq 0) {
-            Write-Host "ℹ️ No se encontraron menciones a tareas (con #) en los commits recientes."
+            Write-Host "ℹ️ No encontré ningún símbolo '#' seguido de números en los mensajes de arriba."
             exit 0
         }
 
-        Write-Host "📌 IDs encontrados: $ids"
+        Write-Host "📌 Intentando cerrar IDs: $ids"
 
-        # Configuramos credenciales y conexión
         $env:AZURE_DEVOPS_EXT_PAT = "$(System.AccessToken)"
         
-        # Intentamos instalar la extensión, si ya existe no pasa nada
-        az extension add --name azure-devops 2>$null
+        # Login explícito para asegurar permisos
+        echo $env:AZURE_DEVOPS_EXT_PAT | az devops login --organization https://dev.azure.com/ProyectoIDGS1003
 
-        Write-Host "🔗 Conectando a Azure DevOps..."
         az devops configure --defaults organization=https://dev.azure.com/ProyectoIDGS1003 project="3LB-Farmacia"
 
+        $hasError = $false
+
         foreach ($id in $ids) {
-            Write-Host "✔️ Cerrando Tarea #$id..."
+            Write-Host "🔄 Procesando Tarea #$id..."
             try {
-                # Forzamos el estado a Done
-                az boards work-item update --id $id --fields "System.State=Done" "Microsoft.VSTS.Scheduling.RemainingWork=0"
+                # Intentamos actualizar. Si falla, capturamos el error.
+                # Usamos --output json para que no llene la pantalla, a menos que falle.
+                az boards work-item update --id $id --fields "System.State=Done" "Microsoft.VSTS.Scheduling.RemainingWork=0" 2>&1 | Out-String -OutVariable azOutput
+                
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Host "   ✅ ¡Tarea #$id cerrada con éxito!" -ForegroundColor Green
+                } else {
+                    throw $azOutput
+                }
             } catch {
-                Write-Error "❌ Error al cerrar la tarea #$id. Verifica permisos o existencia del ID."
+                Write-Error "❌ ERROR CRÍTICO al cerrar tarea #$id"
+                Write-Error $_
+                Write-Warning "💡 SOLUCIÓN: Probablemente el 'Build Service' no tiene permiso para editar tareas."
+                $hasError = $true
             }
         }
+        
+        if ($hasError) {
+            Write-Error "💥 Hubo errores al cerrar tareas. Revisa los permisos (Ver instrucciones)."
+            exit 1
+        }
+
       displayName: '🤖 Cierre automático de Work Items'
       env:
-        AZURE_DEVOPS_EXT_PAT: $(System.AccessToken) # Necesario para tener permiso
+        AZURE_DEVOPS_EXT_PAT: $(System.AccessToken) 
 
     # 3. Configurar Python
     - task: UsePythonVersion@0
@@ -108,7 +123,6 @@ stages:
 
     # 4. Instalar Dependencias
     - script: |
-        echo "📦 Instalando dependencias..."
         pip install --upgrade pip
         pip install -r requirements.txt
       displayName: 'Instalar dependencias'
@@ -116,12 +130,11 @@ stages:
     # 5. Crear Artefacto
     - script: |
         mkdir "$(DeploymentPath)"
-        echo "📂 Carpeta creada: $(DeploymentPath)"
       displayName: 'Crear carpeta de artefactos'
 
     # 6. Copiar Archivos
     - task: CopyFiles@2
-      displayName: 'Copiar archivos al paquete'
+      displayName: 'Copiar archivos'
       inputs:
         SourceFolder: '$(Build.SourcesDirectory)'
         Contents: |
