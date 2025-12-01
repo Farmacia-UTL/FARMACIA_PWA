@@ -31,7 +31,7 @@ stages:
         git clean -xfd
       displayName: 'Limpiar workspace'
 
-    # 2. 🤖 Cierre automático de Tareas (Script Depurado + Logout)
+    # 2. 🤖 Cierre automático de Tareas (Script Depurado + Logout Seguro)
     - powershell: |
         Write-Host "🔍 INICIANDO DIAGNÓSTICO..."
         $branch = "$(Build.SourceBranchName)"
@@ -47,10 +47,11 @@ stages:
             exit 0
         }
 
-        # 🧹 LIMPIEZA DE SESIONES PREVIAS (CRÍTICO EN AGENTE LOCAL)
-        Write-Host "🧹 Cerrando sesiones antiguas de Azure CLI..."
-        az logout 2>$null # Cierra sesión para evitar conflictos
-        az cache purge 2>$null # Limpia caché si existe comando
+        # 🧹 LIMPIEZA DE SESIONES PREVIAS (CORREGIDO)
+        Write-Host "🧹 Asegurando que no haya sesiones antiguas..."
+        # Usamos cmd /c para silenciar TOTALMENTE el error si ya estabas deslogueado
+        cmd /c "az logout >NUL 2>&1"
+        cmd /c "az cache purge >NUL 2>&1"
 
         Write-Host "🧾 Leyendo últimos 15 commits..."
         $commits = git log -n 15 --pretty=format:%s
@@ -75,11 +76,10 @@ stages:
 
         Write-Host "📌 IDs a cerrar: $ids"
 
-        # 🔑 AUTENTICACIÓN: Usamos solo la variable de entorno
+        # 🔑 AUTENTICACIÓN
         $env:AZURE_DEVOPS_EXT_PAT = "$(System.AccessToken)"
         
         Write-Host "🔗 Configurando organización..."
-        # Configuramos sin login interactivo, confiando en la variable PAT
         az devops configure --defaults organization=https://dev.azure.com/ProyectoIDGS1003 project="3LB-Farmacia"
 
         $hasError = $false
