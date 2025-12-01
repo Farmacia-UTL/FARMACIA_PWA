@@ -31,31 +31,29 @@ stages:
         git clean -xfd
       displayName: 'Limpiar workspace'
 
-    # 2. 🤖 Cierre automático de Tareas (Script Depurado)
+    # 2. 🤖 Cierre automático de Tareas (Script Depurado + Logout)
     - powershell: |
         Write-Host "🔍 INICIANDO DIAGNÓSTICO..."
         $branch = "$(Build.SourceBranchName)"
-        Write-Host "   -> Rama detectada: $branch"
-
+        
         if ($branch -ne "master" -and $branch -ne "main") {
           Write-Host "⏩ No estamos en master/main. Saltando."
           exit 0
         }
 
-        # Validación de seguridad: ¿Existe el comando 'az'?
+        # Validación: ¿Existe el comando 'az'?
         if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
             Write-Warning "⚠️ El comando 'az' no funciona. Reinicia el agente."
             exit 0
         }
 
+        # 🧹 LIMPIEZA DE SESIONES PREVIAS (CRÍTICO EN AGENTE LOCAL)
+        Write-Host "🧹 Cerrando sesiones antiguas de Azure CLI..."
+        az logout 2>$null # Cierra sesión para evitar conflictos
+        az cache purge 2>$null # Limpia caché si existe comando
+
         Write-Host "🧾 Leyendo últimos 15 commits..."
-        # Usamos -n 15 para evitar errores si hay pocos commits
         $commits = git log -n 15 --pretty=format:%s
-        
-        Write-Host "--------------------------------"
-        Write-Host "   MENSAJES ENCONTRADOS:"
-        $commits | ForEach-Object { Write-Host "   * $_" }
-        Write-Host "--------------------------------"
         
         $regex = '#(\d+)'
         $ids = @()
@@ -63,7 +61,7 @@ stages:
         foreach ($line in $commits) {
             if ($line -match $regex) {
                 $id = $matches[1]
-                Write-Host "   -> ¡Detectado ID #$id en el mensaje!"
+                Write-Host "   -> ¡Detectado ID #$id!"
                 $ids += $id
             }
         }
@@ -71,42 +69,40 @@ stages:
         $ids = $ids | Select-Object -Unique
 
         if ($ids.Count -eq 0) {
-            Write-Host "ℹ️ No encontré ningún símbolo '#' seguido de números en los mensajes de arriba."
+            Write-Host "ℹ️ No encontré tareas para cerrar."
             exit 0
         }
 
-        Write-Host "📌 Intentando cerrar IDs: $ids"
+        Write-Host "📌 IDs a cerrar: $ids"
 
-        # 🛑 CORRECCIÓN: Eliminamos el 'az devops login' explícito que causaba error en Windows.
-        # La autenticación se hace automática usando la variable de entorno AZURE_DEVOPS_EXT_PAT definida abajo.
+        # 🔑 AUTENTICACIÓN: Usamos solo la variable de entorno
+        $env:AZURE_DEVOPS_EXT_PAT = "$(System.AccessToken)"
         
-        Write-Host "🔗 Configurando contexto de Azure DevOps..."
+        Write-Host "🔗 Configurando organización..."
+        # Configuramos sin login interactivo, confiando en la variable PAT
         az devops configure --defaults organization=https://dev.azure.com/ProyectoIDGS1003 project="3LB-Farmacia"
 
         $hasError = $false
 
         foreach ($id in $ids) {
             Write-Host "🔄 Procesando Tarea #$id..."
-            try {
-                # Intentamos actualizar. Si falla, capturamos el error.
-                # Usamos --output json para que no llene la pantalla, a menos que falle.
-                az boards work-item update --id $id --fields "System.State=Done" "Microsoft.VSTS.Scheduling.RemainingWork=0" 2>&1 | Out-String -OutVariable azOutput
-                
-                if ($LASTEXITCODE -eq 0) {
-                    Write-Host "   ✅ ¡Tarea #$id cerrada con éxito!" -ForegroundColor Green
-                } else {
-                    throw $azOutput
-                }
-            } catch {
-                Write-Error "❌ ERROR CRÍTICO al cerrar tarea #$id"
-                Write-Error $_
-                Write-Warning "💡 SOLUCIÓN: Probablemente el 'Build Service' no tiene permiso para editar tareas."
+            
+            # Ejecutamos el comando y capturamos TODO (éxito y error)
+            $output = az boards work-item update --id $id --fields "System.State=Done" "Microsoft.VSTS.Scheduling.RemainingWork=0" 2>&1
+            
+            # Verificamos si falló ($LASTEXITCODE es 0 si todo salió bien)
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "   ✅ Tarea #$id cerrada correctamente." -ForegroundColor Green
+            } else {
+                Write-Error "❌ ERROR al cerrar tarea #$id"
+                Write-Host "   🔍 Detalle del error de Azure:" -ForegroundColor Red
+                Write-Host $output
                 $hasError = $true
             }
         }
         
         if ($hasError) {
-            Write-Error "💥 Hubo errores al cerrar tareas. Revisa los permisos (Ver instrucciones)."
+            Write-Error "💥 Hubo fallos. Si dice 'Unauthorized', revisa los permisos del 'Build Service'."
             exit 1
         }
 
