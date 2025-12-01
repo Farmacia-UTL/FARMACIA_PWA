@@ -88,7 +88,8 @@ stages:
             Write-Host "🔄 Procesando Tarea #$id..."
             
             # Ejecutamos el comando y capturamos TODO (éxito y error)
-            $output = az boards work-item update --id $id --fields "System.State=Done" "Microsoft.VSTS.Scheduling.RemainingWork=0" 2>&1
+            # 🛑 CORRECCIÓN: Cambiamos 'Done' por 'Closed' porque tu proyecto usa Agile
+            $output = az boards work-item update --id $id --fields "System.State=Closed" "Microsoft.VSTS.Scheduling.RemainingWork=0" 2>&1
             
             # Verificamos si falló ($LASTEXITCODE es 0 si todo salió bien)
             if ($LASTEXITCODE -eq 0) {
