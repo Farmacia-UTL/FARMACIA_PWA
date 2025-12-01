@@ -4,7 +4,7 @@
 # =====================================================
 
 trigger:
-- main
+- master
 
 pool:
   name: 'AgenteLocal'
@@ -30,49 +30,35 @@ stages:
     displayName: 'Job: Instalación y Empaquetado'
     steps:
 
-    # --- 0. Limpiar workspace ---
     - script: |
-        echo "🧹 Limpiando directorio de trabajo previo..."
-        git clean -xfd
-        echo "Verificando contenido actual de requirements.txt:"
-        type requirements.txt
-      displayName: 'Limpiar workspace y mostrar requirements.txt'
+        echo "🔍 Detectando rama..."
+        if [ "$(Build.SourceBranchName)" != "master" ]; then
+          echo "⏩ No es main. No se cierran tareas."
+          exit 0
+        fi
 
-    # --- 1. Configurar versión de Python ---
-    - task: UsePythonVersion@0
-      displayName: 'Configurar Python $(PythonVersion)'
-      inputs:
-        versionSpec: '$(PythonVersion)'
+        echo "🧰 Instalando Azure CLI..."
+        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 
-    # --- 2. Instalar dependencias ---
-    - script: |
-        echo "📦 Instalando dependencias..."
-        pip install --upgrade pip
-        pip install -r requirements.txt || (echo "Reintentando instalación..." && pip install -r requirements.txt)
-      displayName: 'Instalar Flask y dependencias'
+        az extension add --name azure-devops || true
 
-    # ✅ Crea el directorio de artefactos ANTES de copiar archivos
-    - script: |
-        # Esto soluciona el error "Not found PathtoPublish"
-        mkdir -p "$(DeploymentPath)"
-        echo "Directorio de despliegue creado: $(DeploymentPath)"
-      displayName: 'Crear Directorio de Artefactos'
+        echo "🔗 Configurando DevOps CLI..."
+        az devops configure --defaults \
+          organization=https://dev.azure.com/ProyectoIDGS1003 \
+          project="3LB-Farmacia"
 
-    # --- 3. Copiar archivos para despliegue ---
-    - task: CopyFiles@2
-      displayName: 'Copiar Código de Aplicación'
-      inputs:
-        SourceFolder: '$(Build.SourcesDirectory)'
-        Contents: |
-          sgt/** # Tu código fuente, incluyendo main.py
-          requirements.txt     # CRÍTICO: Para instalar dependencias en Azure
-          templates/** # CRÍTICO: Templates en la raíz
-          start.sh # 🛠️ Nuevo script de inicio
-        TargetFolder: '$(DeploymentPath)'
+        echo "🧾 Obteniendo IDs de work items desde los commits..."
+        git log --pretty=format:%s HEAD~10..HEAD \
+          | grep -oE '#[0-9]+' | sort -u | tr -d '#' > wi.txt
 
-    # --- 4. Publicar artefactos ---
-    - task: PublishPipelineArtifact@1 
-      displayName: 'Publicar Artefacto de Despliegue'
-      inputs:
-        targetPath: '$(DeploymentPath)' 
-        artifact: '$(ArtifactName)'
+        echo "📌 IDs detectados:"
+        cat wi.txt
+
+        for ID in $(cat wi.txt); do
+          echo "✔️ Cerrando Work Item $ID..."
+          az boards work-item update \
+           --id $ID \
+           --fields "System.State=Done" \
+                    "Microsoft.VSTS.Scheduling.RemainingWork=0"
+        done
+      displayName: "🤖 Cierre automático de Work Items"
