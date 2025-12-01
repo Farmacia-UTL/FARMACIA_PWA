@@ -1,150 +1,102 @@
-# =====================================================
-# 📦 Pipeline CI para App Flask (SGT) - Solo Build
-# Plataforma: Windows (AgenteLocal)
-# Flujo:
-#   1. CI: Build + Cierre automático de Work Items (PowerShell)
-#   (Se eliminó el despliegue a Azure)
-# =====================================================
-
 trigger:
-- master  # ⚠️ Asegúrate de que esta sea tu rama principal
+  - master
 
 pool:
   name: 'AgenteLocal'
 
 variables:
-  # Rutas y Nombres
-  AppSourceDir: '$(Build.SourcesDirectory)/sgt'
   ArtifactName: 'sgt-deploy-package'
   DeploymentPath: '$(Build.ArtifactStagingDirectory)/$(ArtifactName)'
-  
-  # ⬇️ Variables de Azure (Comentadas porque no se usarán)
-  # ServiceConnectionName: 'AZ-Conexion-SGT'
-  # AppServiceName: 'sgt-app-integrated-2025'
-  
-  # Configuración
   PythonVersion: '3.11'
 
-# =====================================================
-# ETAPAS DEL PIPELINE
-# =====================================================
 stages:
-
-# -----------------------------------------------------
-# 1️⃣ ETAPA 1: CI - Integración Continua (Build)
-# -----------------------------------------------------
 - stage: CI_Build
-  displayName: 'Etapa 1: Empaquetado y Gestión (CI)'
+  displayName: 'Empaquetado + cierre de work items'
   jobs:
   - job: PythonCI
-    displayName: 'Job: Preparación'
+    displayName: 'Preparación CI'
     steps:
 
-    # 1.1 Limpieza del área de trabajo
     - script: |
         echo "🧹 Limpiando workspace..."
         git clean -xfd
       displayName: 'Limpiar workspace'
 
-    # 1.2 🤖 SCRIPT CORREGIDO: Cierre automático de Work Items (PowerShell para Windows)
-    # 🛑 NOTA: Se usa 'powershell' explícitamente para evitar errores de CMD
     - powershell: |
         Write-Host "🔍 Detectando rama..."
         $branch = "$(Build.SourceBranchName)"
-        
-        # Validamos si es master
+
         if ($branch -ne "master") {
-          Write-Host "⏩ La rama es '$branch'. Solo se cierran tareas en 'master'. Saltando..."
+          Write-Host "⏩ No es master, no se cierran work items"
           exit 0
         }
 
-        Write-Host "🧰 Verificando herramientas Azure CLI..."
-        
-        # ✅ NUEVA VALIDACIÓN ROBUSTA:
-        # Si 'az' no existe, terminamos el script suavemente (exit 0) para NO romper el pipeline.
-        if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
-            Write-Warning "⚠️ Azure CLI ('az') no detectado en el sistema."
-            Write-Warning "   -> Causa probable: Instalaste Azure CLI pero NO reiniciaste el agente."
-            Write-Warning "   -> Solución: Cierra y vuelve a abrir el agente 'run.cmd' o reinicia el servicio."
-            Write-Warning "⏩ Saltando el cierre automático de tareas para continuar con el Build..."
-            exit 0
-        }
-
-        # Si llegamos aquí, es que 'az' existe. Continuamos.
-        # Instala la extensión de devops si falta
-        az extension add --name azure-devops 2>$null
-
-        Write-Host "🔗 Configurando conexión a DevOps..."
-        az devops configure --defaults organization=https://dev.azure.com/ProyectoIDGS1003 project="3LB-Farmacia"
-
-        Write-Host "🧾 Buscando IDs de tareas (#123) en los últimos commits..."
-        # Obtiene mensajes de los últimos 10 commits
+        Write-Host "🧾 Buscando IDs en los commits..."
         $commits = git log --pretty=format:%s HEAD~10..HEAD
-        
-        # Regex para buscar #NUMERO
         $regex = '#(\d+)'
         $ids = @()
-        
+
         foreach ($line in $commits) {
             if ($line -match $regex) {
                 $ids += $matches[1]
             }
         }
-        
-        # Filtra duplicados
+
         $ids = $ids | Select-Object -Unique
 
         if ($ids.Count -eq 0) {
-            Write-Host "⚠️ No se detectaron IDs de tareas en los commits recientes."
+            Write-Host "⚠️ No se detectaron tareas"
             exit 0
         }
 
-        Write-Host "📌 IDs encontrados para cerrar: $ids"
+        Write-Host "📌 IDs encontrados: $ids"
 
-        # Autenticación con el token del sistema
         $env:AZURE_DEVOPS_EXT_PAT = "$(System.AccessToken)"
 
-        foreach ($id in $ids) {
-            Write-Host "✔️ Cerrando Work Item #$id..."
-            # Actualiza estado a Done y RemainingWork a 0
-            az boards work-item update --id $id --fields "System.State=Done" "Microsoft.VSTS.Scheduling.RemainingWork=0"
-        }
-      displayName: "🤖 Cierre automático de Work Items"
-      env:
-        AZURE_DEVOPS_EXT_PAT: $(System.AccessToken) # 🔑 Permiso crítico
+        az extension add --name azure-devops --only-show-errors
 
-    # 1.3 Configurar Python
+        az devops configure --defaults `
+          organization=https://dev.azure.com/ProyectoIDGS1003 `
+          project="3LB-Farmacia"
+
+        foreach ($id in $ids) {
+            Write-Host "✔️ Cerrando tarea $id"
+            az boards work-item update `
+              --id $id `
+              --fields "System.State=Done" `
+                        "Microsoft.VSTS.Scheduling.RemainingWork=0"
+        }
+      displayName: '🤖 Cierre automático de Work Items'
+      env:
+        System.AccessToken: $(System.AccessToken)
+
     - task: UsePythonVersion@0
-      displayName: 'Configurar Python $(PythonVersion)'
+      displayName: 'Configurar Python'
       inputs:
         versionSpec: '$(PythonVersion)'
 
-    # 1.4 Instalar Dependencias
     - script: |
-        echo "📦 Instalando dependencias..."
         pip install --upgrade pip
         pip install -r requirements.txt
       displayName: 'Instalar dependencias'
 
-    # 1.5 Crear carpeta temporal
     - script: |
-        mkdir -p "$(DeploymentPath)"
-        echo "Directorio creado: $(DeploymentPath)"
+        mkdir "$(DeploymentPath)"
       displayName: 'Crear carpeta de artefactos'
 
-    # 1.6 Copiar archivos al paquete
     - task: CopyFiles@2
-      displayName: 'Copiar Archivos al Artefacto'
+      displayName: 'Copiar archivos'
       inputs:
         SourceFolder: '$(Build.SourcesDirectory)'
         Contents: |
-          sgt/** requirements.txt 
-          templates/** start.sh         
+          sgt/**
+          requirements.txt
+          templates/**
+          start.sh
         TargetFolder: '$(DeploymentPath)'
 
-    # 1.7 Publicar Artefacto
-    - task: PublishPipelineArtifact@1 
+    - task: PublishPipelineArtifact@1
       displayName: 'Publicar Artefacto'
       inputs:
-        targetPath: '$(DeploymentPath)' 
+        targetPath: '$(DeploymentPath)'
         artifact: '$(ArtifactName)'
