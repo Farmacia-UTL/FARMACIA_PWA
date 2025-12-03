@@ -1,9 +1,13 @@
 import React, { useState } from "react";
-import "../inicios/inicio.css"; // reusa tu paleta/clases si gustas
+import { NavLink, useNavigate } from "react-router-dom";
+import "../inicios/inicio.css";
 
-const API_URL = import.meta.env.VITE_API_URL || "https://api-farmacia.ngrok.app";
+const API_URL =
+  import.meta.env.VITE_API_URL || "https://api-farmacia.ngrok.app";
 
 export default function AgregarMedicamento() {
+  const navigate = useNavigate();
+
   const [form, setForm] = useState({
     nombre: "",
     cantidad: "",
@@ -13,12 +17,25 @@ export default function AgregarMedicamento() {
     beneficios: "",
     instrucciones: "",
     advertencias: "",
-    fotoUrl: "",          // 👈 ahora se captura la URL aquí
+    fotoUrl: "",
   });
 
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
   const [imgOk, setImgOk] = useState(true);
+
+  const nombreAdmin =
+    localStorage.getItem("nombreUsuario") ||
+    localStorage.getItem("userName") ||
+    localStorage.getItem("userEmail") ||
+    "Administrador";
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("rol");
+    localStorage.removeItem("nombreUsuario");
+    navigate("/login");
+  };
 
   const onChange = (e) => {
     const { name, value } = e.target;
@@ -30,17 +47,16 @@ export default function AgregarMedicamento() {
     setMsg("");
     setLoading(true);
 
-    // construir payload JSON
     const payload = {
       nombre: form.nombre,
       cantidad: Number(form.cantidad || 0),
-      tipo: form.tipo || "",
+      tipo: form.tipo,
       precio: Number(form.precio || 0),
-      descripcion: form.descripcion || "",
-      beneficios: form.beneficios || "",
-      instrucciones: form.instrucciones || "",
-      advertencias: form.advertencias || "",
-      fotoUrl: form.fotoUrl || null, // puede ser null/"" si no hay imagen
+      descripcion: form.descripcion,
+      beneficios: form.beneficios,
+      instrucciones: form.instrucciones,
+      advertencias: form.advertencias,
+      fotoUrl: form.fotoUrl?.trim() || null,
     };
 
     try {
@@ -53,7 +69,7 @@ export default function AgregarMedicamento() {
       const data = await resp.json().catch(() => null);
 
       if (resp.ok) {
-        setMsg("✅ Medicamento agregado");
+        setMsg("✅ Medicamento agregado correctamente");
         setForm({
           nombre: "",
           cantidad: "",
@@ -67,196 +83,163 @@ export default function AgregarMedicamento() {
         });
         setImgOk(true);
       } else {
-        setMsg(data?.title || data?.message || "❌ No se pudo guardar");
+        setMsg(data?.title || data?.message || "❌ Error al guardar");
       }
-    } catch (err) {
-      console.error(err);
-      setMsg("❌ Error de red");
+    } catch {
+      setMsg("❌ Error de conexión");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{ maxWidth: 1100, margin: "24px auto", padding: "0 16px" }}>
-      <h2>Agregar medicamento</h2>
-
-      <form
-        onSubmit={onSubmit}
-        className="card"
-        style={{
-          display: "grid",
-          gap: 14,
-          background: "#fff",
-          padding: 18,
-          borderRadius: 14,
-          boxShadow: "0 8px 24px rgba(0,0,0,.12)",
-        }}
-      >
-        <div className="grid2">
-          <div>
-            <label>Nombre</label>
-            <input
-              name="nombre"
-              value={form.nombre}
-              onChange={onChange}
-              required
-            />
-          </div>
-          <div>
-            <label>Tipo</label>
-            <input
-              name="tipo"
-              value={form.tipo}
-              onChange={onChange}
-              placeholder="Tableta, jarabe, etc."
-            />
-          </div>
-        </div>
-
-        <div className="grid2">
-          <div>
-            <label>Cantidad</label>
-            <input
-              type="number"
-              min="0"
-              name="cantidad"
-              value={form.cantidad}
-              onChange={onChange}
-              required
-            />
-          </div>
-          <div>
-            <label>Precio</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              name="precio"
-              value={form.precio}
-              onChange={onChange}
-              required
-            />
-          </div>
-        </div>
-
-        <div>
-          <label>Descripción</label>
-          <textarea
-            rows={3}
-            name="descripcion"
-            value={form.descripcion}
-            onChange={onChange}
-          />
-        </div>
-
-        <div className="grid3">
-          <div>
-            <label>Beneficios</label>
-            <textarea
-              rows={3}
-              name="beneficios"
-              value={form.beneficios}
-              onChange={onChange}
-              placeholder="Ej. alivia dolor, reduce fiebre…"
-            />
-          </div>
-          <div>
-            <label>Instrucciones</label>
-            <textarea
-              rows={3}
-              name="instrucciones"
-              value={form.instrucciones}
-              onChange={onChange}
-              placeholder="Ej. tomar 1 tableta cada 8 horas…"
-            />
-          </div>
-          <div>
-            <label>Advertencias</label>
-            <textarea
-              rows={3}
-              name="advertencias"
-              value={form.advertencias}
-              onChange={onChange}
-              placeholder="Ej. no usar en embarazo, puede causar somnolencia…"
-            />
-          </div>
-        </div>
-
-        {/* 👉 CAMBIO: campo para URL de la imagen con preview */}
-        <div className="grid2">
-          <div>
-            <label>URL de la foto (opcional)</label>
-            <input
-              type="url"
-              name="fotoUrl"
-              value={form.fotoUrl}
-              onChange={onChange}
-              placeholder="https://mi-cdn.com/img/producto.png"
-            />
-            <small style={{ color: "#64748b" }}>
-              Debe ser una URL válida (https://…).
-            </small>
-          </div>
-
-          <div style={{ display: "grid", alignItems: "end" }}>
-            <div
-              style={{
-                border: "1px solid #e5e7eb",
-                borderRadius: 10,
-                padding: 6,
-                background: "#fafafa",
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-              }}
-            >
-              <img
-                src={
-                  form.fotoUrl?.trim()
-                    ? form.fotoUrl.trim()
-                    : "https://via.placeholder.com/120x90?text=Preview"
-                }
-                onError={() => setImgOk(false)}
-                onLoad={() => setImgOk(true)}
-                alt="Preview"
-                style={{
-                  width: 120,
-                  height: 90,
-                  objectFit: "cover",
-                  borderRadius: 8,
-                  background: "#e5e7eb",
-                }}
-              />
-              <span style={{ color: imgOk ? "#16a34a" : "#ef4444" }}>
-                {imgOk ? "Vista previa OK" : "URL inválida o no accesible"}
-              </span>
+    <>
+      {/* === TOPBAR AZUL === */}
+      <header className="admin-menu">
+        <div className="admin-left">
+          <div className="admin-logo">
+            <span className="logo-badge">⚕</span>
+            <div className="logo-text">
+              <span className="logo-title">Farmacia · Admin</span>
+              <span className="logo-subtitle">Panel de control y gestión</span>
             </div>
           </div>
         </div>
 
-        <button type="submit" className="btn-login" disabled={loading}>
-          {loading ? "Guardando…" : "Guardar"}
-        </button>
-        {msg && <p className="login-message">{msg}</p>}
-      </form>
+        <nav className="admin-nav">
+          <NavLink to="/inicioAdmin" className="admin-link">Inicio</NavLink>
 
-      {/* utilidades de grilla si no existen en tu CSS */}
-      <style>{`
-        .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-        .grid3 { display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
-        @media (max-width: 900px){
-          .grid2, .grid3 { grid-template-columns: 1fr; }
-        }
-        .card input, .card textarea {
-          width: 100%;
-          padding: 10px 12px;
-          border-radius: 10px;
-          border: 1px solid #e5e7eb;
-          outline: none;
-        }
-        .card label { display:block; font-weight:600; margin-bottom:6px; }
-      `}</style>
-    </div>
+          <div className="admin-dropdown">
+            <span className="admin-link">Medicamentos ▾</span>
+            <div className="admin-dropdown-content">
+              <NavLink to="/medicamentos/agregar" className="admin-sublink">Agregar</NavLink>
+              <NavLink to="/medicamentos/inventario" className="admin-sublink">Inventario</NavLink>
+            </div>
+          </div>
+
+          <div className="admin-dropdown">
+            <span className="admin-link">Proveedores ▾</span>
+            <div className="admin-dropdown-content">
+              <NavLink to="/proveedores/crear" className="admin-sublink">Registrar</NavLink>
+              <NavLink to="/proveedores" className="admin-sublink">Lista</NavLink>
+              <NavLink to="/proveedores/pedidos" className="admin-sublink">Pedir</NavLink>
+            </div>
+          </div>
+
+          <div className="admin-dropdown">
+            <span className="admin-link">Pedidos ▾</span>
+            <div className="admin-dropdown-content">
+              <NavLink to="/pedidos" className="admin-sublink">Pedidos</NavLink>
+              <NavLink to="/dashboard" className="admin-sublink">Dashboard</NavLink>
+            </div>
+          </div>
+
+          <NavLink to="/citas" className="admin-link">Citas</NavLink>
+        </nav>
+
+        <div className="admin-right">
+          <span className="admin-tag">Rol: Admin · {nombreAdmin}</span>
+          <button className="btn-ghost logout-btn" onClick={handleLogout}>
+            Cerrar sesión
+          </button>
+        </div>
+      </header>
+
+      {/* === FORMULARIO === */}
+      <main className="addmed-page">
+
+        <button className="addmed-back" onClick={() => navigate(-1)}>
+          ← Regresar
+        </button>
+
+        <section className="addmed-card">
+          <h2 className="addmed-title">Formulario de registro</h2>
+          <p className="addmed-subtitle">
+            Completa los campos para registrar un medicamento.
+          </p>
+
+          <form onSubmit={onSubmit} className="addmed-form">
+            
+
+            <div className="addmed-grid2">
+              <div className="addmed-field">
+                <label>Nombre</label>
+                <input name="nombre" value={form.nombre} onChange={onChange} required />
+              </div>
+
+              <div className="addmed-field">
+                <label>Tipo</label>
+                <input name="tipo" value={form.tipo} onChange={onChange} placeholder="Tableta, jarabe..." />
+              </div>
+            </div>
+
+            <div className="addmed-grid2">
+              <div className="addmed-field">
+                <label>Cantidad</label>
+                <input type="number" min="0" name="cantidad" value={form.cantidad} onChange={onChange} required />
+              </div>
+
+              <div className="addmed-field">
+                <label>Precio</label>
+                <input type="number" min="0" step="0.01" name="precio" value={form.precio} onChange={onChange} required />
+              </div>
+            </div>
+
+            <div className="addmed-field">
+              <label>Descripción</label>
+              <textarea rows="2" name="descripcion" value={form.descripcion} onChange={onChange} />
+            </div>
+
+            <div className="addmed-grid3">
+              <div className="addmed-field">
+                <label>Beneficios</label>
+                <textarea rows="2" name="beneficios" value={form.beneficios} onChange={onChange} />
+              </div>
+
+              <div className="addmed-field">
+                <label>Instrucciones</label>
+                <textarea rows="2" name="instrucciones" value={form.instrucciones} onChange={onChange} />
+              </div>
+
+              <div className="addmed-field">
+                <label>Advertencias</label>
+                <textarea rows="2" name="advertencias" value={form.advertencias} onChange={onChange} />
+              </div>
+            </div>
+
+            <div className="addmed-grid2 addmed-image-grid">
+              <div className="addmed-field">
+                <label>URL de la foto (opcional)</label>
+                <input type="url" name="fotoUrl" value={form.fotoUrl} onChange={onChange} placeholder="https://..." />
+              </div>
+
+              <div className="addmed-preview-box">
+                <span>Vista previa</span>
+                <div className="addmed-preview">
+                  <img
+                    src={
+                      form.fotoUrl?.trim()
+                        ? form.fotoUrl
+                        : "https://via.placeholder.com/150x100?text=Preview"
+                    }
+                    onLoad={() => setImgOk(true)}
+                    onError={() => setImgOk(false)}
+                  />
+                  <p className={imgOk ? "ok" : "error"}>
+                    {imgOk ? "URL válida" : "URL inválida"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <button className="addmed-submit" disabled={loading}>
+              {loading ? "Guardando..." : "Guardar medicamento"}
+            </button>
+
+            {msg && <p className="addmed-msg">{msg}</p>}
+          </form>
+        </section>
+      </main>
+    </>
   );
 }

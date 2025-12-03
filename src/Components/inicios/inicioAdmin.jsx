@@ -1,357 +1,389 @@
-import React, { useEffect, useState } from "react";
-import "../inicios/inicio.css";
+import React from "react";
+import "./inicio.css";
 import { NavLink, useNavigate } from "react-router-dom";
-import { getSlots } from "../citas/services/citasApi";
 
 const InicioAdmin = () => {
   const navigate = useNavigate();
 
-  // ====== Agenda rápida (slots) ======
-  const [fecha, setFecha] = useState(() => {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`; // yyyy-mm-dd
-  });
-  const [cargando, setCargando] = useState(false);
-  const [error, setError] = useState("");
-  const [slots, setSlots] = useState([]);
+  const nombreAdmin =
+    localStorage.getItem("nombreUsuario") ||
+    localStorage.getItem("userName") ||
+    localStorage.getItem("userEmail") ||
+    "Administrador";
 
-  const cargarSlots = async () => {
-    try {
-      setCargando(true);
-      setError("");
-      const data = await getSlots({
-        fecha,
-        slotMin: 30,
-        start: "09:00",
-        end: "18:00",
-      });
-      const disponibles = (data.disponibles || []).map((iso) => new Date(iso));
-      setSlots(disponibles);
-    } catch (e) {
-      setError(e.message || "No se pudieron obtener los horarios.");
-      setSlots([]);
-    } finally {
-      setCargando(false);
-    }
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("rol");
+    localStorage.removeItem("nombreUsuario");
+    navigate("/login");
   };
-
-  useEffect(() => {
-    cargarSlots();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fecha]);
-
-  const fmtHora = (d) =>
-    d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
   return (
     <>
-      {/* Topbar */}
+      {/* ======================= TOPBAR ADMIN ======================= */}
       <header className="admin-menu">
+        {/* LADO IZQUIERDO: LOGO + TEXTO */}
         <div className="admin-left">
           <div className="admin-logo">
             <span className="logo-badge">⚕</span>
-            <span>Farmacia · Admin</span>
+            <div className="logo-text">
+              <span className="logo-title">Farmacia · Admin</span>
+              <span className="logo-subtitle">
+                Panel de control y gestión
+              </span>
+            </div>
           </div>
-
-          <nav className="admin-nav">
-            <NavLink to="/inicioAdmin" className="admin-link">
-              Inicio
-            </NavLink>
-
-            <div className="admin-dropdown">
-              <span className="admin-link">Medicamentos ▾</span>
-              <div className="admin-dropdown-content">
-                <NavLink
-                  to="/medicamentos/agregar"
-                  className="admin-sublink"
-                >
-                  ➕ Agregar
-                </NavLink>
-                <NavLink
-                  to="/medicamentos/inventario"
-                  className="admin-sublink"
-                >
-                  📦 Inventario
-                </NavLink>
-              </div>
-            </div>
-
-            {/* Proveedores / Compras */}
-            <div className="admin-dropdown">
-              <span className="admin-link">Proveedores ▾</span>
-              <div className="admin-dropdown-content">
-                <NavLink
-                  to="/proveedores/crear"
-                  className="admin-sublink"
-                >
-                  ➕ Registrar proveedor
-                </NavLink>
-                <NavLink to="/proveedores" className="admin-sublink">
-                  📇 Lista de proveedores
-                </NavLink>
-                <NavLink
-                  to="/proveedores/pedidos"
-                  className="admin-sublink"
-                >
-                  🧾 Pedir medicamentos
-                </NavLink>
-              </div>
-            </div>
-
-            {/* 🧾 Pedidos de clientes */}
-            <div className="admin-dropdown">
-              <span className="admin-link">Pedidos ▾</span>
-              <div className="admin-dropdown-content">
-                <NavLink to="/pedidos" className="admin-sublink">
-                  📋 Ver pedidos
-                </NavLink>
-                {/* Más adelante puedes agregar:
-                <NavLink to="/pedidos/reportes" className="admin-sublink">
-                  📊 Resumen de ventas
-                </NavLink> */}
-              </div>
-            </div>
-
-            {/* Citas */}
-            <div className="admin-dropdown">
-              <span className="admin-link">Citas ▾</span>
-              <div className="admin-dropdown-content">
-                <NavLink to="/citas/agendar" className="admin-sublink">
-                  🗓️ Agendar
-                </NavLink>
-                <NavLink to="/citas" className="admin-sublink">
-                  📒 Mis citas
-                </NavLink>
-                <NavLink to="/citas/agenda" className="admin-sublink">
-                  📆 Agenda del día
-                </NavLink>
-              </div>
-            </div>
-          </nav>
         </div>
 
+        {/* MENÚ CENTRAL */}
+        <nav className="admin-nav">
+          <NavLink
+            to="/inicioAdmin"
+            className={({ isActive }) =>
+              "admin-link" + (isActive ? " active" : "")
+            }
+          >
+            Inicio
+          </NavLink>
+
+          {/* Dropdown Medicamentos */}
+          <div className="admin-dropdown">
+            <span className="admin-link">Medicamentos ▾</span>
+            <div className="admin-dropdown-content">
+              {/* COINCIDE CON: /medicamentos/agregar */}
+              <NavLink to="/medicamentos/agregar" className="admin-sublink">
+                Agregar medicamento
+              </NavLink>
+              {/* COINCIDE CON: /medicamentos/inventario */}
+              <NavLink
+                to="/medicamentos/inventario"
+                className="admin-sublink"
+              >
+                Inventario
+              </NavLink>
+            </div>
+          </div>
+
+          {/* Dropdown Proveedores */}
+          <div className="admin-dropdown">
+            <span className="admin-link">Proveedores ▾</span>
+            <div className="admin-dropdown-content">
+              {/* /proveedores/crear */}
+              <NavLink to="/proveedores/crear" className="admin-sublink">
+                Registrar proveedor
+              </NavLink>
+              {/* /proveedores */}
+              <NavLink to="/proveedores" className="admin-sublink">
+                Lista de proveedores
+              </NavLink>
+              {/* /proveedores/pedidos */}
+              <NavLink to="/proveedores/pedidos" className="admin-sublink">
+                Pedir a proveedor
+              </NavLink>
+            </div>
+          </div>
+
+          {/* Dropdown Pedidos */}
+          <div className="admin-dropdown">
+            <span className="admin-link">Pedidos ▾</span>
+            <div className="admin-dropdown-content">
+              {/* /pedidos */}
+              <NavLink to="/pedidos" className="admin-sublink">
+                Pedidos de usuarios
+              </NavLink>
+              {/* /dashboard */}
+              <NavLink to="/dashboard" className="admin-sublink">
+                Dashboard / Reportes
+              </NavLink>
+            </div>
+          </div>
+
+          {/* Citas → /citas */}
+          <NavLink
+            to="/citas"
+            className={({ isActive }) =>
+              "admin-link" + (isActive ? " active" : "")
+            }
+          >
+            Citas
+          </NavLink>
+
+          {/* Si aún no tienes ruta de usuarios, puedes dejar este fuera
+          <NavLink
+            to="/usuarios-admin"
+            className={({ isActive }) =>
+              "admin-link" + (isActive ? " active" : "")
+            }
+          >
+            Usuarios
+          </NavLink>
+          */}
+        </nav>
+
+        {/* LADO DERECHO: INFO + LOGOUT */}
         <div className="admin-right">
-          <span className="admin-tag">Sesión segura</span>
+          <span className="admin-tag">Rol: Admin · {nombreAdmin}</span>
+          <button
+            type="button"
+            className="btn-ghost logout-btn"
+            onClick={handleLogout}
+          >
+            Cerrar sesión
+          </button>
         </div>
       </header>
 
-      {/* Hero */}
+      {/* ======================= HERO ======================= */}
       <section className="inicio-hero modern">
+        {/* Texto principal */}
         <div className="inicio-texto">
-          <h1 className="inicio-title">Bienvenido Administrador</h1>
+          <h1 className="inicio-title">Panel de administración</h1>
           <p className="inicio-lead">
-            Gestiona el <strong>inventario</strong>, usuarios,{" "}
-            <strong>citas</strong> y reportes.
+            Desde aquí puedes gestionar medicamentos, proveedores, pedidos y
+            citas de la farmacia. Usa los módulos de abajo para ir directo a cada
+            sección.
           </p>
 
-          <div className="hero-actions">
-            <NavLink to="/medicamentos/agregar" className="btn-cta">
-              Agregar medicamento
-            </NavLink>
-            <NavLink to="/medicamentos/inventario" className="btn-ghost">
-              Ver inventario
-            </NavLink>
+          <div className="module-actions">
+            <button
+              type="button"
+              className="chip"
+              onClick={() =>
+                document
+                  .getElementById("admin-modules")
+                  ?.scrollIntoView({ behavior: "smooth" })
+              }
+            >
+              Ver módulos principales
+            </button>
+            <button
+              type="button"
+              className="chip"
+              onClick={() => navigate("/dashboard")}
+            >
+              Ir al Dashboard
+            </button>
           </div>
-
-          <ul className="hero-points">
-            <li>💊 Control preciso de stock</li>
-            <li>🧾 Precios, advertencias e instrucciones</li>
-            <li>🗓️ Agenda con horarios disponibles</li>
-            <li>📊 Reportes limpios y exportables</li>
-          </ul>
         </div>
 
-        <aside className="inicio-card pretty">
+        {/* Imagen / tarjeta derecha */}
+        <div className="inicio-card pretty">
           <img
-            src="https://www.istockphoto.com/photo/shelves-stacked-with-medicines-gm1150671524-311567098"
-            alt="Estantería de farmacia"
+            src="https://images.pexels.com/photos/6129044/pexels-photo-6129044.jpeg?auto=compress&cs=tinysrgb&w=1200"
+            alt="Farmacia Panel Admin"
           />
-          <div className="card-sticker">
-            <span className="pill-icon">💊</span>
-            <span className="sticker-text">Inventario al día</span>
-          </div>
-        </aside>
+        </div>
       </section>
 
-      {/* Agenda rápida de Citas */}
-      <section className="modules" style={{ marginTop: "-8px" }}>
-        <article className="module-card" style={{ gridColumn: "1 / -1" }}>
-          <div className="module-icon">🗓️</div>
-          <h3 style={{ marginBottom: 10 }}>Agenda rápida</h3>
-          <p style={{ marginBottom: 12, color: "var(--muted)" }}>
-            Revisa los <strong>horarios disponibles</strong> (09:00–18:00) y
-            agenda en un clic.
-          </p>
-
-          <div
-            style={{
-              display: "flex",
-              gap: 10,
-              alignItems: "center",
-              flexWrap: "wrap",
-              marginBottom: 12,
-            }}
-          >
-            <label style={{ fontWeight: 700, color: "var(--ink)" }}>
-              Fecha:
-            </label>
-            <input
-              type="date"
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
-              style={{
-                padding: "8px 10px",
-                borderRadius: 10,
-                border: "1px solid #d6e7e6",
-                background: "#fff",
-                color: "var(--ink)",
-                fontWeight: 600,
-              }}
-            />
-            <button className="chip" onClick={cargarSlots} disabled={cargando}>
-              {cargando ? "Actualizando..." : "Actualizar"}
-            </button>
-            <NavLink to="/citas" className="chip">
-              📒 Mis citas
-            </NavLink>
-          </div>
-
-          {error && (
-            <div
-              style={{
-                background: "#fff3f3",
-                border: "1px solid #ffd2d2",
-                color: "#b01515",
-                padding: "10px 12px",
-                borderRadius: 12,
-                marginBottom: 12,
-                fontWeight: 700,
-              }}
-            >
-              {error}
+      {/* ======================= MÓDULOS ======================= */}
+      <section className="modules" id="admin-modules">
+        {/* Módulo Medicamentos */}
+        <article className="module-card module-medicamentos">
+          <div className="module-header">
+            <div className="module-icon" />
+            <div>
+              <h2 className="module-title">Medicamentos</h2>
+              <p className="module-subtitle">
+                Altas, bajas, ediciones y control de inventario.
+              </p>
             </div>
-          )}
-
-          {/* grid de slots */}
-          <div
-            style={{
-              display: "grid",
-              gap: 8,
-              gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))",
-            }}
-          >
-            {cargando && (
-              <span style={{ color: "var(--muted)" }}>
-                Cargando horarios…
-              </span>
-            )}
-            {!cargando && slots.length === 0 && (
-              <span style={{ color: "var(--muted)" }}>
-                No hay horarios disponibles.
-              </span>
-            )}
-            {!cargando &&
-              slots.map((d) => (
-                <button
-                  key={d.toISOString()}
-                  className="chip"
-                  title="Agendar en este horario"
-                  onClick={() =>
-                    navigate("/citas/agendar", {
-                      state: { preseleccion: d.toISOString().slice(0, 16) }, // yyyy-mm-ddTHH:MM
-                    })
-                  }
-                  style={{ justifySelf: "stretch", textAlign: "center" }}
-                >
-                  {fmtHora(d)}
-                </button>
-              ))}
           </div>
-        </article>
-      </section>
-
-      {/* Quick modules */}
-      <section className="modules">
-        <article className="module-card">
-          <div className="module-icon">💊</div>
-          <h3>Medicamentos</h3>
-          <p>Alta, edición, advertencias, instrucciones y más.</p>
-          <div className="module-actions">
-            <NavLink to="/medicamentos/agregar" className="chip">
-              ➕ Agregar
-            </NavLink>
-            <NavLink to="/medicamentos/inventario" className="chip">
-              📦 Inventario
-            </NavLink>
+          <div className="module-body">
+            <p>
+              Administra el catálogo de medicamentos, precios, stock,
+              descripciones y tipo de medicamento.
+            </p>
+            <div className="module-actions">
+              <button
+                type="button"
+                className="chip"
+                onClick={() => navigate("/medicamentos/agregar")}
+              >
+                Agregar medicamento
+              </button>
+              <button
+                type="button"
+                className="chip"
+                onClick={() => navigate("/medicamentos/inventario")}
+              >
+                Ver inventario
+              </button>
+            </div>
           </div>
         </article>
 
-        {/* Proveedores / Compras */}
-        <article className="module-card">
-          <div className="module-icon">🏭</div>
-          <h3>Proveedores y compras</h3>
-          <p>Registra proveedores y pide medicamentos para surtir stock.</p>
-          <div className="module-actions">
-            <NavLink to="/proveedores/crear" className="chip">
-              ➕ Registrar proveedor
-            </NavLink>
-            <NavLink to="/proveedores" className="chip">
-              📇 Ver proveedores
-            </NavLink>
-            <NavLink to="/proveedores/pedidos" className="chip">
-              🧾 Pedir medicamentos
-            </NavLink>
+        {/* Módulo Proveedores */}
+        <article className="module-card module-proveedores">
+          <div className="module-header">
+            <div className="module-icon" />
+            <div>
+              <h2 className="module-title">Proveedores</h2>
+              <p className="module-subtitle">
+                Registra y gestiona a quienes surten la farmacia.
+              </p>
+            </div>
+          </div>
+          <div className="module-body">
+            <p>
+              Mantén control de contactos, teléfonos, correos y direcciones de
+              tus proveedores, además de los pedidos asociados.
+            </p>
+            <div className="module-actions">
+              <button
+                type="button"
+                className="chip"
+                onClick={() => navigate("/proveedores/crear")}
+              >
+                Registrar proveedor
+              </button>
+              <button
+                type="button"
+                className="chip"
+                onClick={() => navigate("/proveedores")}
+              >
+                Lista de proveedores
+              </button>
+              <button
+                type="button"
+                className="chip"
+                onClick={() => navigate("/proveedores/pedidos")}
+              >
+                Pedir medicamentos
+              </button>
+            </div>
           </div>
         </article>
 
-        {/* 🧾 Pedidos de clientes */}
-        <article className="module-card">
-          <div className="module-icon">🧾</div>
-          <h3>Pedidos</h3>
-          <p>Revisa y gestiona los pedidos realizados por los usuarios.</p>
-          <div className="module-actions">
-            <NavLink to="/pedidos" className="chip">
-              📋 Ver pedidos
-            </NavLink>
+        {/* Módulo Pedidos */}
+        <article className="module-card module-pedidos">
+          <div className="module-header">
+            <div className="module-icon" />
+            <div>
+              <h2 className="module-title">Pedidos de usuarios</h2>
+              <p className="module-subtitle">
+                Revisa y actualiza el estado de los pedidos online.
+              </p>
+            </div>
+          </div>
+          <div className="module-body">
+            <p>
+              Confirma, rechaza o marca como entregados los pedidos realizados
+              desde el panel de usuario. Da seguimiento rápido a lo más reciente.
+            </p>
+            <div className="module-actions">
+              <button
+                type="button"
+                className="chip"
+                onClick={() => navigate("/pedidos")}
+              >
+                Ver pedidos
+              </button>
+            </div>
           </div>
         </article>
 
-        <article className="module-card">
-          <div className="module-icon">🗓️</div>
-          <h3>Citas</h3>
-          <p>Agenda con horarios disponibles de 9:00 a 18:00.</p>
-          <div className="module-actions">
-            <NavLink to="/citas/agendar" className="chip">
-              🗓️ Agendar
-            </NavLink>
-            <NavLink to="/citas" className="chip">
-              📒 Mis citas
-            </NavLink>
+        {/* Módulo Citas */}
+        <article className="module-card module-citas">
+          <div className="module-header">
+            <div className="module-icon" />
+            <div>
+              <h2 className="module-title">Citas</h2>
+              <p className="module-subtitle">
+                Control de las citas agendadas por los usuarios.
+              </p>
+            </div>
+          </div>
+          <div className="module-body">
+            <p>
+              Visualiza las citas por día, médico, horario y estado. Administra
+              confirmaciones y cancelaciones.
+            </p>
+            <div className="module-actions">
+              <button
+                type="button"
+                className="chip"
+                onClick={() => navigate("/citas")}
+              >
+                Ver citas
+              </button>
+              <button
+                type="button"
+                className="chip"
+                onClick={() => navigate("/citas/agendar")}
+              >
+                Agendar cita manual
+              </button>
+            </div>
           </div>
         </article>
 
-        <article className="module-card">
-          <div className="module-icon">👥</div>
-          <h3>Usuarios</h3>
-          <p>Control de acceso y roles (Admin / Personal).</p>
-          <div className="module-actions">
-            <button className="chip" disabled>
-              Próximamente
-            </button>
+        {/* Módulo Reportes / Dashboard */}
+        <article className="module-card module-reportes">
+          <div className="module-header">
+            <div className="module-icon" />
+            <div>
+              <h2 className="module-title">Reportes y Dashboard</h2>
+              <p className="module-subtitle">
+                Medicamento más vendido, días con más ventas y más.
+              </p>
+            </div>
+          </div>
+          <div className="module-body">
+            <p>
+              Visualiza gráficos de ventas, medicamentos más solicitados, horas
+              pico y comportamiento general de la farmacia.
+            </p>
+            <div className="module-actions">
+              <button
+                type="button"
+                className="chip"
+                onClick={() => navigate("/dashboard")}
+              >
+                Abrir Dashboard
+              </button>
+            </div>
           </div>
         </article>
 
-        <article className="module-card">
-          <div className="module-icon">📊</div>
-          <h3>Reportes</h3>
-          <p>Movimientos de stock y precios en el tiempo.</p>
-          <div className="module-actions">
-            <button className="chip" disabled>
-              Próximamente
-            </button>
+        {/* Módulo Resumen rápido */}
+        <article className="module-card module-ultimo">
+          <div className="module-header">
+            <div className="module-icon" />
+            <div>
+              <h2 className="module-title">Resumen rápido</h2>
+              <p className="module-subtitle">
+                Atajos a lo que más usas en el día a día.
+              </p>
+            </div>
+          </div>
+          <div className="module-body">
+            <p>
+              Accede rápidamente al inventario, pedidos recientes y reportes sin
+              perder tiempo navegando por todo el sistema.
+            </p>
+            <div className="module-actions">
+              <button
+                type="button"
+                className="chip"
+                onClick={() => navigate("/medicamentos/inventario")}
+              >
+                Inventario
+              </button>
+              <button
+                type="button"
+                className="chip"
+                onClick={() => navigate("/pedidos")}
+              >
+                Últimos pedidos
+              </button>
+              <button
+                type="button"
+                className="chip"
+                onClick={() => navigate("/dashboard")}
+              >
+                Ver métricas
+              </button>
+            </div>
           </div>
         </article>
       </section>
@@ -360,3 +392,4 @@ const InicioAdmin = () => {
 };
 
 export default InicioAdmin;
+  

@@ -1,180 +1,281 @@
-// src/Components/citas/CitaForm.jsx
-import React, { useEffect, useMemo, useState } from "react";
+// src/Components/citas/__CitaForm.jsx
+import React, { useEffect, useState } from "react";
 import { getSlots } from "./services/citasApi";
 
-const inputS = {
-  width: "100%",
-  padding: "10px",
-  borderRadius: 10,
-  border: "1px solid #d6e7e6",
-};
+export default function CitaForm({ initial = {}, onSubmit, submitting }) {
+  const preFecha = initial.fechaHora ? initial.fechaHora.slice(0, 10) : "";
+  const preHora = initial.fechaHora ? initial.fechaHora.slice(11, 16) : "";
 
-const hoyYYYYMMDD = () => {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-};
-
-export default function CitaForm({ initial, onSubmit, submitting }) {
-  // initial.fechaHora puede venir como "YYYY-MM-DDTHH:MM"
-  const [fecha, setFecha] = useState(() => {
-    if (initial?.fechaHora?.includes("T")) return initial.fechaHora.split("T")[0];
-    return hoyYYYYMMDD();
+  const [form, setForm] = useState({
+    nombrePaciente: initial.nombrePaciente || "",
+    fecha: preFecha,
+    hora: preHora,
+    tipoConsulta: initial.tipoConsulta || "",
+    notas: initial.notas || "",
   });
 
-  const [hora, setHora] = useState(() => {
-    if (initial?.fechaHora?.includes("T")) return initial.fechaHora.split("T")[1]; // "HH:MM"
-    return "";
-  });
+  const [slots, setSlots] = useState([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsError, setSlotsError] = useState("");
 
-  const [tipoConsulta, setTipoConsulta] = useState(initial?.tipoConsulta || "General");
-  const [notas, setNotas] = useState(initial?.notas || "");
+  const today = new Date().toISOString().slice(0, 10);
 
-  const [cargandoSlots, setCargandoSlots] = useState(false);
-  const [errorSlots, setErrorSlots] = useState("");
-  const [listaHoras, setListaHoras] = useState([]); // ["09:00","09:30",...]
-
-  const puedeEnviar = useMemo(
-    () => !!fecha && !!hora && !submitting,
-    [fecha, hora, submitting]
-  );
-
-  // 🔹 Cargar slots cuando cambia la fecha
   useEffect(() => {
-    let cancel = false;
-
-    (async () => {
-      try {
-        setCargandoSlots(true);
-        setErrorSlots("");
-        setListaHoras([]);
-
-        // Llamada al backend
-        const slots = await getSlots({ fecha });
-
-        // slots = [ { fechaHora, horaTexto, disponible }, ... ]
-        const horasDisponibles = slots
-          .filter((s) => s.disponible)
-          .map((s) => s.horaTexto); // ["09:00", "09:30", ...]
-
-        if (!cancel) {
-          setListaHoras(horasDisponibles);
-
-          // Si la hora seleccionada ya no está disponible, la limpiamos
-          if (hora && !horasDisponibles.includes(hora)) {
-            setHora("");
-          }
-        }
-      } catch (e) {
-        if (!cancel) {
-          setErrorSlots(
-            e.message || "No se pudieron cargar los horarios."
-          );
-        }
-      } finally {
-        if (!cancel) setCargandoSlots(false);
+    const cargarSlots = async () => {
+      if (!form.fecha) {
+        setSlots([]);
+        setSlotsError("");
+        return;
       }
-    })();
-
-    return () => {
-      cancel = true;
+      try {
+        setSlotsLoading(true);
+        setSlotsError("");
+        const data = await getSlots({ fecha: form.fecha });
+        setSlots(Array.isArray(data) ? data : []);
+      } catch (e) {
+        console.error(e);
+        setSlots([]);
+        setSlotsError(e.message || "No se pudieron cargar los horarios.");
+      } finally {
+        setSlotsLoading(false);
+      }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fecha]);
+
+    cargarSlots();
+  }, [form.fecha]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm((f) => ({ ...f, [name]: value }));
+
+    if (name === "fecha") {
+      setForm((fPrev) => ({ ...fPrev, fecha: value, hora: "" }));
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Construye "YYYY-MM-DDTHH:MM"
-    const fechaHora = `${fecha}T${hora}`;
-    onSubmit({ fechaHora, tipoConsulta, notas });
+
+    if (!form.nombrePaciente.trim()) {
+      alert("Escribe el nombre del paciente.");
+      return;
+    }
+    if (!form.fecha) {
+      alert("Selecciona una fecha.");
+      return;
+    }
+    if (!form.hora) {
+      alert("Selecciona un horario disponible.");
+      return;
+    }
+    if (!form.tipoConsulta) {
+      alert("Selecciona el tipo de consulta.");
+      return;
+    }
+
+    const seleccion = new Date(`${form.fecha}T${form.hora}`);
+    const ahora = new Date();
+    if (seleccion < ahora) {
+      alert("No puedes agendar una cita en una fecha u hora pasada.");
+      return;
+    }
+
+    onSubmit({
+      nombrePaciente: form.nombrePaciente.trim(),
+      fecha: form.fecha,
+      hora: form.hora,
+      tipoConsulta: form.tipoConsulta,
+      notas: form.notas,
+    });
+  };
+
+  const slotsDisponibles = slots.filter((s) => s.disponible);
+
+  const inputBase = {
+    width: "100%",
+    padding: "9px 3px",
+    borderRadius: 14,
+    border: "1px solid #cbd5e1",
+    fontSize: 14,
+    background: "rgba(248,250,252,0.92)",
+    outline: "none",
+    transition: "border-color 0.2s, box-shadow 0.2s, background 0.2s",
+  };
+
+  const labelBase = {
+    display: "block",
+    fontWeight: 600,
+    marginBottom: 4,
+    fontSize: 14,
+    color: "#0f172a",
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: "grid", gap: 12 }}>
-      {/* Fecha */}
-      <label>
-        <strong>Fecha</strong>
+    <form
+      onSubmit={handleSubmit}
+      style={{
+        display: "grid",
+        gap: 16,
+        marginTop: 10,
+      }}
+    >
+      {/* Nombre del paciente */}
+      <div>
+        <label htmlFor="nombrePaciente" style={labelBase}>
+          Nombre del paciente
+        </label>
         <input
-          type="date"
-          value={fecha}
-          onChange={(e) => setFecha(e.target.value)}
+          id="nombrePaciente"
+          name="nombrePaciente"
+          type="text"
           required
-          style={inputS}
+          value={form.nombrePaciente}
+          onChange={handleChange}
+          placeholder="Ej. Juan Pérez López"
+          style={inputBase}
         />
-      </label>
+      </div>
 
-      {/* Hora */}
-      <label>
-        <strong>Hora</strong>
-        <select
-          value={hora}
-          onChange={(e) => setHora(e.target.value)}
-          required
-          style={inputS}
-        >
-          <option value="" disabled>
-            {cargandoSlots ? "Cargando horarios…" : "Selecciona una hora"}
-          </option>
+      {/* Grid fecha + hora */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1.2fr 1fr",
+          gap: 14,
+        }}
+      >
+        {/* Fecha */}
+        <div>
+          <label htmlFor="fecha" style={labelBase}>
+            Fecha
+          </label>
+          <input
+            id="fecha"
+            name="fecha"
+            type="date"
+            required
+            min={today}
+            value={form.fecha}
+            onChange={handleChange}
+            style={inputBase}
+          />
+        </div>
 
-          {listaHoras.map((h) => (
-            <option key={h} value={h}>
-              {h}
-            </option>
-          ))}
-        </select>
-
-        {errorSlots && (
-          <div
-            style={{
-              marginTop: 6,
-              color: "#b01515",
-              fontWeight: 700,
-            }}
+        {/* Horario */}
+        <div>
+          <label htmlFor="hora" style={labelBase}>
+            Horario disponible
+          </label>
+          <select
+            id="hora"
+            name="hora"
+            required
+            value={form.hora}
+            onChange={handleChange}
+            disabled={
+              !form.fecha || slotsLoading || slotsDisponibles.length === 0
+            }
+            style={inputBase}
           >
-            {errorSlots}
-          </div>
-        )}
+            {!form.fecha && (
+              <option value="">Selecciona primero una fecha</option>
+            )}
 
-        {!errorSlots && !cargandoSlots && listaHoras.length === 0 && (
-          <div style={{ marginTop: 6, color: "var(--muted)" }}>
-            No hay horarios disponibles para esta fecha.
-          </div>
-        )}
-      </label>
+            {form.fecha && slotsLoading && (
+              <option value="">Cargando horarios...</option>
+            )}
+
+            {form.fecha && !slotsLoading && slotsDisponibles.length === 0 && (
+              <option value="">No hay horarios disponibles este día</option>
+            )}
+
+            {form.fecha &&
+              !slotsLoading &&
+              slotsDisponibles.length > 0 && (
+                <>
+                  <option value="">Selecciona un horario</option>
+                  {slotsDisponibles.map((s) => (
+                    <option key={s.fechaHora} value={s.horaTexto}>
+                      {s.horaTexto}
+                    </option>
+                  ))}
+                </>
+              )}
+          </select>
+          {slotsError && (
+            <p
+              style={{
+                marginTop: 4,
+                fontSize: 12,
+                color: "#b91c1c",
+              }}
+            >
+              {slotsError}
+            </p>
+          )}
+        </div>
+      </div>
 
       {/* Tipo de consulta */}
-      <label>
-        <strong>Tipo de consulta</strong>
+      <div>
+        <label htmlFor="tipoConsulta" style={labelBase}>
+          Tipo de consulta
+        </label>
         <select
-          value={tipoConsulta}
-          onChange={(e) => setTipoConsulta(e.target.value)}
-          style={inputS}
+          id="tipoConsulta"
+          name="tipoConsulta"
+          required
+          value={form.tipoConsulta}
+          onChange={handleChange}
+          style={inputBase}
         >
-          <option>General</option>
-          <option>Farmacológica</option>
-          <option>Seguimiento</option>
+          <option value="">Selecciona una opción</option>
+          <option value="General">Consulta general</option>
+          <option value="Control">Control</option>
+          <option value="Receta">Receta / Seguimiento</option>
         </select>
-      </label>
+      </div>
 
       {/* Notas */}
-      <label>
-        <strong>Notas</strong>
+      <div>
+        <label htmlFor="notas" style={labelBase}>
+          Notas
+        </label>
         <textarea
+          id="notas"
+          name="notas"
           rows={3}
-          value={notas}
-          onChange={(e) => setNotas(e.target.value)}
-          placeholder="Motivo, síntomas, etc."
-          style={inputS}
+          value={form.notas}
+          onChange={handleChange}
+          placeholder="Notas adicionales (opcional)"
+          style={{
+            ...inputBase,
+            resize: "vertical",
+          }}
         />
-      </label>
-
-      <div style={{ display: "flex", gap: 8 }}>
-        <button className="btn-cta" disabled={!puedeEnviar} type="submit">
-          {submitting ? "Guardando..." : "Guardar"}
-        </button>
       </div>
+
+      {/* Botón guardar (AZUL) */}
+      <button
+        type="submit"
+        disabled={submitting}
+        style={{
+          marginTop: 4,
+          alignSelf: "flex-end",
+          padding: "10px 22px",
+          borderRadius: 999,
+          border: "none",
+          fontWeight: 600,
+          fontSize: 15,
+          cursor: submitting ? "not-allowed" : "pointer",
+          background:
+            "linear-gradient(90deg, rgba(37,99,235,1) 0%, rgba(59,130,246,1) 100%)",
+          color: "#f9fafb",
+          boxShadow: "0 10px 26px rgba(37,99,235,0.55)",
+        }}
+      >
+        {submitting ? "Guardando..." : "Guardar cita"}
+      </button>
     </form>
   );
 }

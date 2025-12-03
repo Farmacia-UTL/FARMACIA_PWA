@@ -12,26 +12,23 @@ const authHeaders = (extra = {}) => {
 // === SLOTS (GET /api/Citas/slots)
 export async function getSlots({ fecha }) {
   const url = new URL(`${API_URL}/api/Citas/slots`);
-  url.searchParams.set("dia", fecha); // 👈 el backend espera 'dia'
+  url.searchParams.set("dia", fecha);
 
   const resp = await fetch(url, {
     headers: authHeaders(),
-    // SIN credentials aquí
   });
 
-  if (!resp.ok) throw new Error(await resp.text() || "No se pudieron cargar los horarios.");
-  return resp.json(); // [ { fechaHora, horaTexto, disponible }, ... ]
+  if (!resp.ok) throw new Error((await resp.text()) || "No se pudieron cargar los horarios.");
+  return resp.json();
 }
 
-// GET /api/Citas?desde=&hasta=
-export async function getMisCitas({ desde, hasta } = {}) {
+// GET /api/Citas?estado=...
+export async function getMisCitas({ estado } = {}) {
   const url = new URL(`${API_URL}/api/Citas`);
-  if (desde) url.searchParams.set("desde", desde);
-  if (hasta) url.searchParams.set("hasta", hasta);
+  if (estado && estado !== "Todos") url.searchParams.set("estado", estado);
 
   const resp = await fetch(url, {
     headers: authHeaders(),
-    // SIN credentials
   });
 
   if (!resp.ok) throw new Error(await resp.text());
@@ -42,19 +39,24 @@ export async function getMisCitas({ desde, hasta } = {}) {
 export async function getCita(id) {
   const resp = await fetch(`${API_URL}/api/Citas/${id}`, {
     headers: authHeaders(),
-    // SIN credentials
   });
   if (!resp.ok) throw new Error(await resp.text());
   return resp.json();
 }
 
+// Alias por si lo estás usando en otro lado
+export async function getCitaById(id) {
+  return getCita(id);
+}
+
 // POST /api/Citas
-export async function crearCita({ fechaHora, tipoConsulta, notas, duracionMin }) {
+export async function crearCita(payload) {
+  // payload puede incluir fechaHora, tipoConsulta, notas, duracionMin,
+  // y si quieres también observaciones/diagnostico/medicamentos
   const resp = await fetch(`${API_URL}/api/Citas`, {
     method: "POST",
     headers: authHeaders(),
-    // SIN credentials
-    body: JSON.stringify({ fechaHora, tipoConsulta, notas, duracionMin }),
+    body: JSON.stringify(payload),
   });
 
   if (!resp.ok) throw new Error(await resp.text());
@@ -62,12 +64,11 @@ export async function crearCita({ fechaHora, tipoConsulta, notas, duracionMin })
 }
 
 // PUT /api/Citas/{id}
-export async function actualizarCita(id, { tipoConsulta, notas, estatus }) {
+export async function actualizarCita(id, payload) {
   const resp = await fetch(`${API_URL}/api/Citas/${id}`, {
     method: "PUT",
     headers: authHeaders(),
-    // SIN credentials
-    body: JSON.stringify({ tipoConsulta, notas, estatus }),
+    body: JSON.stringify(payload), // 👈 ya no filtramos campos
   });
 
   if (!resp.ok) throw new Error(await resp.text());
@@ -78,7 +79,6 @@ export async function cancelarCita(id) {
   const resp = await fetch(`${API_URL}/api/Citas/${id}`, {
     method: "DELETE",
     headers: authHeaders(),
-    // SIN credentials
   });
 
   if (!resp.ok) throw new Error(await resp.text());

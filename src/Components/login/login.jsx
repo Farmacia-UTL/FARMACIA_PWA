@@ -5,7 +5,7 @@ import './login.css';
 const API_URL = import.meta.env.VITE_API_URL || 'https://api-farmacia.ngrok.app';
 
 const Login = () => {
-  const [user, setUser] = useState('');          // antes: email
+  const [user, setUser] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const navigate = useNavigate();
@@ -19,25 +19,24 @@ const Login = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user,                // 👈 coincide con LoginRequest.User
-          contrasena: password // 👈 coincide con LoginRequest.Contrasena
+          user,                
+          contrasena: password 
         }),
+        credentials: 'include'  
       });
 
-      const data = await resp.json().catch(() => null);
+      const data = await resp.json();
 
       if (resp.ok) {
         setMessage(data?.message || 'Login exitoso');
 
-        // Redirección por rol (mejor que por nombre)
-        if ((data?.rol || '').toLowerCase() === 'admin') {
-          navigate('/inicioAdmin');
+        if (data?.rol && data.rol.toLowerCase() === 'admin') {
+          navigate('/inicioAdmin');  
         } else {
-          navigate('/inicioUser');
+          navigate('/inicioUser');  
         }
       } else {
-        // Intenta leer mensaje del backend; si no, genérico
-        setMessage(data?.message || data || 'Credenciales inválidas');
+        setMessage(data?.message || 'Credenciales inválidas');
       }
     } catch (err) {
       console.error(err);
@@ -80,6 +79,7 @@ const Login = () => {
           <button type="submit" className="btn-login">Iniciar sesión</button>
         </form>
 
+        {/* Mostrar mensaje de error o éxito */}
         {message && <p className="login-message">{message}</p>}
       </div>
     </div>
