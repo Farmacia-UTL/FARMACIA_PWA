@@ -1,0 +1,143 @@
+# =====================================================
+# 📦 Pipeline CI para App Flask (SGT) - Solo Build + Cierre Tareas
+# =====================================================
+
+trigger:
+- master # O 'main'
+
+pool:
+  name: 'AgenteLocal'
+
+variables:
+  ArtifactName: 'sgt-deploy-package'
+  DeploymentPath: '$(Build.ArtifactStagingDirectory)/$(ArtifactName)'
+  PythonVersion: '3.11'
+
+stages:
+- stage: CI_Build
+  displayName: 'Empaquetado y Gestión'
+  jobs:
+  - job: PythonCI
+    displayName: 'Job: Preparación CI'
+    steps:
+
+    # 0. ✅ Descargar historial completo
+    - checkout: self
+      fetchDepth: 0
+
+    # 1. Limpieza
+    - script: |
+        echo "🧹 Limpiando workspace..."
+        git clean -xfd
+      displayName: 'Limpiar workspace'
+
+    # 2. 🤖 Cierre automático de Tareas (Soporte Múltiples IDs)
+    - powershell: |
+        Write-Host "🔍 INICIANDO DIAGNÓSTICO..."
+        $branch = "$(Build.SourceBranchName)"
+        
+        if ($branch -ne "master" -and $branch -ne "main") {
+          Write-Host "⏩ No estamos en master/main. Saltando."
+          exit 0
+        }
+
+        # Validación: ¿Existe el comando 'az'?
+        if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
+            Write-Warning "⚠️ El comando 'az' no funciona. Reinicia el agente."
+            exit 0
+        }
+
+        # 🧹 LIMPIEZA DE SESIONES PREVIAS
+        Write-Host "🧹 Asegurando que no haya sesiones antiguas..."
+        cmd /c "az logout >NUL 2>&1"
+        cmd /c "az cache purge >NUL 2>&1"
+
+        Write-Host "🧾 Leyendo últimos 15 commits..."
+        $commits = git log -n 15 --pretty=format:%s
+        
+        $ids = @()
+
+        # 🛑 MEJORA: Ahora usamos [regex]::Matches para encontrar TODOS los IDs en una línea
+        # Antes solo encontraba el primero (ej. solo #32 de "#32 #33")
+        foreach ($line in $commits) {
+            $matchesFound = [regex]::Matches($line, '#(\d+)')
+            foreach ($match in $matchesFound) {
+                $id = $match.Groups[1].Value
+                Write-Host "   -> ¡Detectado ID #$id!"
+                $ids += $id
+            }
+        }
+        
+        $ids = $ids | Select-Object -Unique
+
+        if ($ids.Count -eq 0) {
+            Write-Host "ℹ️ No encontré tareas para cerrar."
+            exit 0
+        }
+
+        Write-Host "📌 IDs a cerrar: $ids"
+
+        # 🔑 AUTENTICACIÓN
+        $env:AZURE_DEVOPS_EXT_PAT = "$(System.AccessToken)"
+        
+        Write-Host "🔗 Configurando organización..."
+        az devops configure --defaults organization=https://dev.azure.com/ProyectoIDGS1003 project="3LB-Farmacia"
+
+        $hasError = $false
+
+        foreach ($id in $ids) {
+            Write-Host "🔄 Procesando Tarea #$id..."
+            
+            # Ejecutamos el comando y capturamos TODO
+            $output = az boards work-item update --id $id --fields "System.State=Closed" 2>&1
+            
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "   ✅ Tarea #$id cerrada correctamente." -ForegroundColor Green
+            } else {
+                # Ignoramos si falla porque ya estaba cerrada o no existe
+                Write-Warning "⚠️ No se pudo cerrar la tarea #$id. (Tal vez ya estaba cerrada o el ID es incorrecto)"
+                Write-Host "   🔍 Detalle: $output"
+            }
+        }
+        
+        Write-Host "✅ Proceso finalizado."
+
+      displayName: '🤖 Cierre automático de Work Items'
+      env:
+        AZURE_DEVOPS_EXT_PAT: $(System.AccessToken) 
+
+    # 3. Configurar Python
+    - task: UsePythonVersion@0
+      displayName: 'Configurar Python'
+      inputs:
+        versionSpec: '$(PythonVersion)'
+
+    # 4. Instalar Dependencias
+    - script: |
+        pip install --upgrade pip
+        pip install -r requirements.txt
+      displayName: 'Instalar dependencias'
+
+    # 5. Crear Artefacto
+    - script: |
+        mkdir "$(DeploymentPath)"
+      displayName: 'Crear carpeta de artefactos'
+
+    # 6. Copiar Archivos
+    - task: CopyFiles@2
+      displayName: 'Copiar archivos'
+      inputs:
+        SourceFolder: '$(Build.SourcesDirectory)'
+        Contents: |
+          sgt/**
+          requirements.txt
+          templates/**
+          start.sh
+        TargetFolder: '$(DeploymentPath)'
+
+    # 7. Publicar
+    - task: PublishPipelineArtifact@1
+      displayName: 'Publicar Artefacto'
+      inputs:
+        targetPath: '$(DeploymentPath)'
+        artifact: '$(ArtifactName)'
