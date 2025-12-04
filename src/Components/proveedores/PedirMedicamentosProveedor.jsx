@@ -355,42 +355,34 @@ export default function PedirMedicamentosProveedor() {
         }
       }
 
-      // 5.3 Registrar pedido en historial
-      const totalExistentes = itemsExistentes.reduce(
-        (sum, it) => sum + it.subtotal,
-        0
-      );
-      const totalNuevos = itemsNuevos.reduce(
-        (sum, it) => sum + it.subtotal,
-        0
-      );
-      const totalGeneral = totalExistentes + totalNuevos;
-
-      const proveedorSeleccionado = proveedores.find(
-        (p) => (p.id ?? p.Id) === Number(proveedorId)
-      );
-
-      const nuevoRegistro = {
-        fecha: new Date().toISOString(),
-        proveedorId: Number(proveedorId),
-        proveedorNombre:
-          proveedorSeleccionado?.nombre ??
-          proveedorSeleccionado?.Nombre ??
-          "",
+      // 5.3 Registrar pedido en historial del proveedor (DTO del back)
+      const dtoHist = {
         solicitadoPor: solicitadoPor || "Sin nombre",
         notas: notasPedido || "",
-        totalExistentes,
-        totalNuevos,
-        totalGeneral,
-        items: [...itemsExistentes, ...itemsNuevos],
+        items: [
+          ...itemsExistentes.map((it) => ({
+            origen: "Existente",
+            nombreMedicamento: it.nombre,
+            tipo: it.tipo || null,
+            cantidad: it.cantidad,
+            precio: it.precio,
+          })),
+          ...itemsNuevos.map((it) => ({
+            origen: "Nuevo",
+            nombreMedicamento: it.nombre,
+            tipo: it.tipo || null,
+            cantidad: it.cantidad,
+            precio: it.precio,
+          })),
+        ],
       };
 
       const respHist = await fetch(
-        `${API_URL}/api/Proveedores/${proveedorId}/registrar-pedido`,
+        `${API_URL}/api/Proveedores/${proveedorId}/pedidos-historial`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(nuevoRegistro),
+          body: JSON.stringify(dtoHist),
         }
       );
 
@@ -398,8 +390,10 @@ export default function PedirMedicamentosProveedor() {
         const txt = await respHist.text();
         console.error("Error al guardar historial:", txt);
       } else {
-        const dataHist = await respHist.json().catch(() => []);
-        setHistorial(Array.isArray(dataHist) ? dataHist : []);
+        const guardado = await respHist.json().catch(() => null);
+        if (guardado) {
+          setHistorial((lista) => [...lista, guardado]);
+        }
       }
 
       setMsg("✅ Pedido registrado y stock actualizado.");
@@ -420,60 +414,68 @@ export default function PedirMedicamentosProveedor() {
   const handleExportPedido = (p) => {
     if (!p) return;
 
-    const items = p.items ?? p.Items ?? [];
+    const num = (v) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : 0;
+    };
 
+    const items = Array.isArray(p.items)
+      ? p.items
+      : Array.isArray(p.Items)
+      ? p.Items
+      : [];
+
+    const proveedorSeleccionado = proveedores.find(
+      (prov) => (prov.id ?? prov.Id) === Number(proveedorId)
+    );
     const proveedorNombre =
-      p.proveedorNombre ??
-      p.ProveedorNombre ??
-      proveedores.find(
-        (prov) =>
-          (prov.id ?? prov.Id) ===
-          Number(p.proveedorId ?? p.ProveedorId ?? proveedorId)
-      )?.nombre ??
-      proveedores.find(
-        (prov) =>
-          (prov.id ?? prov.Id) ===
-          Number(p.proveedorId ?? p.ProveedorId ?? proveedorId)
-      )?.Nombre ??
+      proveedorSeleccionado?.nombre ??
+      proveedorSeleccionado?.Nombre ??
       "";
 
     const solicitadoPor = p.solicitadoPor ?? p.SolicitadoPor ?? "";
     const notas = p.notas ?? p.Notas ?? "";
 
-    const totalExistentesPedido = Number(
-      p.totalExistentes ?? p.TotalExistentes ?? 0
+    const totalExistentesPedido = num(
+      p.totalExistentes ?? p.TotalExistentes
     );
-    const totalNuevosPedido = Number(
-      p.totalNuevos ?? p.TotalNuevos ?? 0
-    );
-    const totalGeneralPedido = Number(
-      p.totalGeneral ?? p.TotalGeneral ?? 0
-    );
+    const totalNuevosPedido = num(p.totalNuevos ?? p.TotalNuevos);
+    const totalGeneralPedido = num(p.totalGeneral ?? p.TotalGeneral);
 
     const win = window.open("", "_blank");
     if (!win) return;
 
-    const fechaLocal = new Date(p.fecha).toLocaleString();
+    const fechaIso = p.fecha ?? p.Fecha ?? new Date().toISOString();
+    const fechaLocal = new Date(fechaIso).toLocaleString();
 
     const rowsHtml = (items || [])
-      .map(
-        (it, idx) => `
-        <tr>
-          <td style="padding:4px;">${idx + 1}</td>
-          <td style="padding:4px;">${it.origen ?? it.Origen ?? ""}</td>
-          <td style="padding:4px;">${it.nombre ?? it.Nombre ?? ""}</td>
-          <td style="padding:4px;">${it.tipo ?? it.Tipo ?? ""}</td>
-          <td style="padding:4px; text-align:right;">${
-            it.cantidad ?? it.Cantidad ?? ""
-          }</td>
-          <td style="padding:4px; text-align:right;">
-            $${Number(it.precio ?? it.Precio ?? 0).toFixed(2)}
-          </td>
-          <td style="padding:4px; text-align:right;">
-            $${Number(it.subtotal ?? it.Subtotal ?? 0).toFixed(2)}
-          </td>
-        </tr>`
-      )
+      .map((it, idx) => {
+        const cant = num(it.cantidad ?? it.Cantidad);
+        const precio = num(it.precio ?? it.Precio);
+        const subtotal = num(it.subtotal ?? it.Subtotal);
+
+        const nombreMed =
+          it.nombreMedicamento ??
+          it.NombreMedicamento ??
+          it.nombre ??
+          it.Nombre ??
+          "";
+
+        return `
+          <tr>
+            <td style="padding:4px;">${idx + 1}</td>
+            <td style="padding:4px;">${it.origen ?? it.Origen ?? ""}</td>
+            <td style="padding:4px;">${nombreMed}</td>
+            <td style="padding:4px;">${it.tipo ?? it.Tipo ?? ""}</td>
+            <td style="padding:4px; text-align:right;">${cant}</td>
+            <td style="padding:4px; text-align:right;">
+              $${precio.toFixed(2)}
+            </td>
+            <td style="padding:4px; text-align:right;">
+              $${subtotal.toFixed(2)}
+            </td>
+          </tr>`;
+      })
       .join("");
 
     win.document.write(`
@@ -485,9 +487,9 @@ export default function PedirMedicamentosProveedor() {
         <body style="font-family: Arial, sans-serif; padding:16px;">
           <h2>Pedido a proveedor</h2>
           <p><b>Fecha:</b> ${fechaLocal}</p>
-          <p><b>Proveedor:</b> ${proveedorNombre}</p>
-          <p><b>Solicitado por:</b> ${solicitadoPor}</p>
-          <p><b>Notas:</b> ${notas}</p>
+          <p><b>Proveedor:</b> ${proveedorNombre || "(sin nombre)"}</p>
+          <p><b>Solicitado por:</b> ${solicitadoPor || "(sin nombre)"}</p>
+          <p><b>Notas:</b> ${notas || "(sin notas)"}</p>
 
           <table style="width:100%; border-collapse:collapse; margin-top:16px; font-size:13px;" border="1">
             <thead>
@@ -545,10 +547,7 @@ export default function PedirMedicamentosProveedor() {
     (sum, it) => sum + it.subtotal,
     0
   );
-  const totalNuevos = itemsNuevos.reduce(
-    (sum, it) => sum + it.subtotal,
-    0
-  );
+  const totalNuevos = itemsNuevos.reduce((sum, it) => sum + it.subtotal, 0);
   const totalGeneral = totalExistentes + totalNuevos;
 
   // ==========================
@@ -556,103 +555,96 @@ export default function PedirMedicamentosProveedor() {
   // ==========================
   return (
     <>
-      {/* Topbar simple (ya tienes admin-menu en inicio.css) */}
+      {/* Topbar simple (admin-menu ya viene de inicio.css) */}
       <header className="admin-menu">
         <div className="admin-left">
           <div className="admin-logo">
-            <span className="logo-badge"></span>
+            <span className="logo-badge">⚕</span>
             <div className="logo-text">
-              <span className="logo-title">Farmacia</span>
-              <span className="logo-subtitle">Panel administrador</span>
+              <span className="logo-title">Farmacia · Admin</span>
+              <span className="logo-subtitle">Pedidos a proveedores</span>
             </div>
           </div>
         </div>
       </header>
 
-      <div style={{ maxWidth: 1100, margin: "34px auto", padding: "0 16px" }}>
-        <h1 style={{ marginBottom: 10, fontSize: 26 }}>
-          Pedir medicamentos por proveedor
-        </h1>
+      <main className="pedido-page">
+        <header className="pedido-header">
+          <div>
+            <h1>Pedidos a proveedores</h1>
+            <p>
+              Elige un proveedor, agrega medicamentos al pedido y actualiza el
+              inventario de forma controlada.
+            </p>
+          </div>
 
-        {/* Botón regresar (azul) */}
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          style={{
-            marginBottom: 20,
-            background: "linear-gradient(90deg,#2563eb,#1d4ed8)",
-            color: "#ffffff",
-            fontWeight: 600,
-            border: "1px solid #1d4ed8",
-            padding: "10px 22px",
-            borderRadius: "999px",
-            cursor: "pointer",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "6px",
-            boxShadow: "0 10px 25px rgba(37,99,235,0.55)",
-            transition: "background 0.2s, box-shadow 0.2s, transform 0.1s",
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.background =
-              "linear-gradient(90deg,#1d4ed8,#1e40af)";
-            e.currentTarget.style.boxShadow =
-              "0 12px 30px rgba(30,64,175,0.65)";
-            e.currentTarget.style.transform = "translateY(-1px)";
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.background =
-              "linear-gradient(90deg,#2563eb,#1d4ed8)";
-            e.currentTarget.style.boxShadow =
-              "0 10px 25px rgba(37,99,235,0.55)";
-            e.currentTarget.style.transform = "translateY(0)";
-          }}
-        >
-          ← Regresar
-        </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => navigate(-1)}
+          >
+            ← Regresar
+          </button>
+        </header>
 
         {/* Selector de proveedor */}
-        <div
-          className="card pedido-card"
-          style={{ marginBottom: 18, display: "grid", gap: 10 }}
-        >
-          <label className="pedido-label">Proveedor</label>
-          <select
-            value={proveedorId}
-            onChange={onChangeProveedor}
-            className="pedido-field"
-          >
-            <option value="">-- Selecciona un proveedor --</option>
-            {proveedores.map((p) => (
-              <option key={p.id ?? p.Id} value={p.id ?? p.Id}>
-                {p.nombre ?? p.Nombre}
-              </option>
-            ))}
-          </select>
-          <small className="pedido-help">
-            Primero elige el proveedor con el que vas a hacer el pedido.
-          </small>
-        </div>
+        <section className="pedido-card">
+          <div className="pedido-card-header">
+            <div className="pedido-icon">🏢</div>
+            <div>
+              <h2>Proveedor</h2>
+              <p>Selecciona el proveedor con el que vas a realizar el pedido.</p>
+            </div>
+          </div>
+
+          <div className="pedido-field-wrap">
+            <label className="pedido-label">Proveedor</label>
+            <select
+              value={proveedorId}
+              onChange={onChangeProveedor}
+              className="pedido-field"
+            >
+              <option value="">-- Selecciona un proveedor --</option>
+              {proveedores.map((p) => (
+                <option key={p.id ?? p.Id} value={p.id ?? p.Id}>
+                  {p.nombre ?? p.Nombre}
+                </option>
+              ))}
+            </select>
+            <small className="pedido-help">
+              Al cambiar de proveedor se limpiará el pedido actual.
+            </small>
+          </div>
+        </section>
 
         {/* Card principal: tabs + formularios */}
-        <div className="card pedido-card" style={{ display: "grid", gap: 18 }}>
+        <section className="pedido-card">
+          <div className="pedido-card-header">
+            <div className="pedido-icon">💊</div>
+            <div>
+              <h2>Agregar medicamentos al pedido</h2>
+              <p>
+                Puedes solicitar medicamentos ya registrados o crear nuevos al
+                mismo tiempo.
+              </p>
+            </div>
+          </div>
+
           {/* Tabs */}
           <div className="tab-row">
             <button
               type="button"
-              className="tab-btn"
-              data-active={modo === "existente"}
+              className={`tab-btn ${modo === "existente" ? "active" : ""}`}
               onClick={() => onChangeModo("existente")}
             >
-              Pedir de medicamento existente
+              Medicamento existente
             </button>
             <button
               type="button"
-              className="tab-btn"
-              data-active={modo === "nuevo"}
+              className={`tab-btn ${modo === "nuevo" ? "active" : ""}`}
               onClick={() => onChangeModo("nuevo")}
             >
-              Crear nuevo medicamento
+              Nuevo medicamento
             </button>
           </div>
 
@@ -660,10 +652,8 @@ export default function PedirMedicamentosProveedor() {
           {modo === "existente" && (
             <form
               onSubmit={onAddExistenteToCarrito}
-              style={{ display: "grid", gap: 14, marginTop: 4 }}
+              className="pedido-form-grid"
             >
-              <h3 className="pedido-title">Agregar al pedido (existente)</h3>
-
               <div className="grid2">
                 <div className="pedido-field-wrap">
                   <label className="pedido-label">Medicamento</label>
@@ -697,12 +687,11 @@ export default function PedirMedicamentosProveedor() {
                 </div>
               </div>
 
-              <div style={{ marginTop: 4 }}>
+              <div className="pedido-actions">
                 <button
                   type="submit"
-                  className="btn teal"
+                  className="btn-primary"
                   disabled={loading}
-                  style={{ paddingInline: 20 }}
                 >
                   Agregar al pedido
                 </button>
@@ -712,14 +701,7 @@ export default function PedirMedicamentosProveedor() {
 
           {/* Formulario: NUEVO */}
           {modo === "nuevo" && (
-            <form
-              onSubmit={onAddNuevoToCarrito}
-              style={{ display: "grid", gap: 14, marginTop: 4 }}
-            >
-              <h3 className="pedido-title">
-                Agregar al pedido (nuevo medicamento)
-              </h3>
-
+            <form onSubmit={onAddNuevoToCarrito} className="pedido-form-grid">
               <div className="grid2">
                 <div className="pedido-field-wrap">
                   <label className="pedido-label">Nombre</label>
@@ -778,7 +760,7 @@ export default function PedirMedicamentosProveedor() {
                   name="descripcion"
                   value={nuevoMed.descripcion}
                   onChange={onChangeNuevoMed}
-                  className="pedido-field"
+                  className="pedido-field textarea"
                 />
               </div>
 
@@ -790,7 +772,7 @@ export default function PedirMedicamentosProveedor() {
                     name="beneficios"
                     value={nuevoMed.beneficios}
                     onChange={onChangeNuevoMed}
-                    className="pedido-field"
+                    className="pedido-field textarea"
                   />
                 </div>
                 <div className="pedido-field-wrap">
@@ -800,7 +782,7 @@ export default function PedirMedicamentosProveedor() {
                     name="instrucciones"
                     value={nuevoMed.instrucciones}
                     onChange={onChangeNuevoMed}
-                    className="pedido-field"
+                    className="pedido-field textarea"
                   />
                 </div>
                 <div className="pedido-field-wrap">
@@ -810,7 +792,7 @@ export default function PedirMedicamentosProveedor() {
                     name="advertencias"
                     value={nuevoMed.advertencias}
                     onChange={onChangeNuevoMed}
-                    className="pedido-field"
+                    className="pedido-field textarea"
                   />
                 </div>
               </div>
@@ -829,12 +811,11 @@ export default function PedirMedicamentosProveedor() {
                 />
               </div>
 
-              <div style={{ marginTop: 4 }}>
+              <div className="pedido-actions">
                 <button
                   type="submit"
-                  className="btn teal"
+                  className="btn-primary"
                   disabled={loading}
-                  style={{ paddingInline: 20 }}
                 >
                   Agregar al pedido
                 </button>
@@ -844,32 +825,38 @@ export default function PedirMedicamentosProveedor() {
 
           {msg && (
             <p
-              style={{
-                marginTop: 8,
-                fontSize: 14,
-                color: msg.startsWith("✅") ? "#16a34a" : "#b91c1c",
-              }}
+              className={`pedido-msg ${
+                msg.startsWith("✅") ? "ok" : "err"
+              }`}
             >
               {msg}
             </p>
           )}
-        </div>
+        </section>
 
         {/* Resumen del pedido */}
-        <div className="card pedido-card" style={{ marginTop: 20 }}>
-          <h2 className="pedido-title">Resumen del pedido</h2>
+        <section className="pedido-card">
+          <div className="pedido-card-header">
+            <div className="pedido-icon">🧾</div>
+            <div>
+              <h2>Resumen del pedido</h2>
+              <p>
+                Revisa los medicamentos incluidos antes de confirmar y actualizar el inventario.
+              </p>
+            </div>
+          </div>
 
           <div className="grid2">
             <div className="pedido-field-wrap">
               <label className="pedido-label">Proveedor que envía</label>
-              <div className="pedido-chip">
+              <div className="pill-info">
                 {proveedorSeleccionado
                   ? `${
                       proveedorSeleccionado.nombre ??
                       proveedorSeleccionado.Nombre
                     } (${
                       proveedorSeleccionado.contacto ??
-                      proveedorSeleccionado.Contacto ??
+                        proveedorSeleccionado.Contacto ??
                       "sin contacto"
                     })`
                   : "Sin proveedor seleccionado"}
@@ -893,45 +880,35 @@ export default function PedirMedicamentosProveedor() {
               rows={3}
               value={notasPedido}
               onChange={(e) => setNotasPedido(e.target.value)}
-              className="pedido-field"
+              className="pedido-field textarea"
               placeholder="Ej. Urgente, entregar antes del viernes, etc."
             />
           </div>
 
           {/* Tabla de items */}
-          <div style={{ overflowX: "auto" }}>
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                fontSize: 13,
-              }}
-            >
+          <div className="table-wrap">
+            <table className="pedido-table">
               <thead>
                 <tr>
-                  <th style={{ textAlign: "left", padding: 8 }}>Origen</th>
-                  <th style={{ textAlign: "left", padding: 8 }}>
-                    Medicamento
-                  </th>
-                  <th style={{ textAlign: "left", padding: 8 }}>Tipo</th>
-                  <th style={{ textAlign: "right", padding: 8 }}>Cantidad</th>
-                  <th style={{ textAlign: "right", padding: 8 }}>Precio</th>
-                  <th style={{ textAlign: "right", padding: 8 }}>Subtotal</th>
+                  <th>Origen</th>
+                  <th>Medicamento</th>
+                  <th>Tipo</th>
+                  <th style={{ textAlign: "right" }}>Cantidad</th>
+                  <th style={{ textAlign: "right" }}>Precio</th>
+                  <th style={{ textAlign: "right" }}>Subtotal</th>
                 </tr>
               </thead>
               <tbody>
                 {itemsExistentes.map((it) => (
                   <tr key={`ex-${it.id}`}>
-                    <td style={{ padding: 8 }}>Existente</td>
-                    <td style={{ padding: 8 }}>{it.nombre}</td>
-                    <td style={{ padding: 8 }}>{it.tipo}</td>
-                    <td style={{ padding: 8, textAlign: "right" }}>
-                      {it.cantidad}
-                    </td>
-                    <td style={{ padding: 8, textAlign: "right" }}>
+                    <td>Existente</td>
+                    <td>{it.nombre}</td>
+                    <td>{it.tipo}</td>
+                    <td style={{ textAlign: "right" }}>{it.cantidad}</td>
+                    <td style={{ textAlign: "right" }}>
                       ${it.precio.toFixed(2)}
                     </td>
-                    <td style={{ padding: 8, textAlign: "right" }}>
+                    <td style={{ textAlign: "right" }}>
                       ${it.subtotal.toFixed(2)}
                     </td>
                   </tr>
@@ -939,58 +916,50 @@ export default function PedirMedicamentosProveedor() {
 
                 {itemsNuevos.map((it) => (
                   <tr key={`new-${it.tempId}`}>
-                    <td style={{ padding: 8 }}>Nuevo</td>
-                    <td style={{ padding: 8 }}>{it.nombre}</td>
-                    <td style={{ padding: 8 }}>{it.tipo}</td>
-                    <td style={{ padding: 8, textAlign: "right" }}>
-                      {it.cantidad}
-                    </td>
-                    <td style={{ padding: 8, textAlign: "right" }}>
+                    <td>Nuevo</td>
+                    <td>{it.nombre}</td>
+                    <td>{it.tipo}</td>
+                    <td style={{ textAlign: "right" }}>{it.cantidad}</td>
+                    <td style={{ textAlign: "right" }}>
                       ${it.precio.toFixed(2)}
                     </td>
-                    <td style={{ padding: 8, textAlign: "right" }}>
+                    <td style={{ textAlign: "right" }}>
                       ${it.subtotal.toFixed(2)}
                     </td>
                   </tr>
                 ))}
 
-                {itemsExistentes.length === 0 && itemsNuevos.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      style={{
-                        padding: 8,
-                        textAlign: "center",
-                        color: "#6b7280",
-                      }}
-                    >
-                      No hay medicamentos en el pedido todavía.
-                    </td>
-                  </tr>
-                )}
+                {itemsExistentes.length === 0 &&
+                  itemsNuevos.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="pedido-empty">
+                        No hay medicamentos en el pedido todavía.
+                      </td>
+                    </tr>
+                  )}
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={5} style={{ padding: 8, textAlign: "right" }}>
-                    <b>Total medicamentos existentes:</b>
+                  <td colSpan={5} className="pedido-total-label">
+                    Total medicamentos existentes:
                   </td>
-                  <td style={{ padding: 8, textAlign: "right" }}>
+                  <td className="pedido-total-value">
                     ${totalExistentes.toFixed(2)}
                   </td>
                 </tr>
                 <tr>
-                  <td colSpan={5} style={{ padding: 8, textAlign: "right" }}>
-                    <b>Total medicamentos nuevos:</b>
+                  <td colSpan={5} className="pedido-total-label">
+                    Total medicamentos nuevos:
                   </td>
-                  <td style={{ padding: 8, textAlign: "right" }}>
+                  <td className="pedido-total-value">
                     ${totalNuevos.toFixed(2)}
                   </td>
                 </tr>
                 <tr>
-                  <td colSpan={5} style={{ padding: 8, textAlign: "right" }}>
-                    <b>Total general del pedido:</b>
+                  <td colSpan={5} className="pedido-total-label">
+                    Total general del pedido:
                   </td>
-                  <td style={{ padding: 8, textAlign: "right" }}>
+                  <td className="pedido-total-value">
                     ${totalGeneral.toFixed(2)}
                   </td>
                 </tr>
@@ -998,31 +967,38 @@ export default function PedirMedicamentosProveedor() {
             </table>
           </div>
 
-          <div style={{ marginTop: 10 }}>
+          <div className="pedido-actions">
             <button
               type="button"
-              className="btn teal"
+              className="btn-teal"
               disabled={
                 loading ||
                 (!itemsExistentes.length && !itemsNuevos.length) ||
                 !proveedorId
               }
               onClick={onConfirmarPedido}
-              style={{ paddingInline: 24 }}
             >
               {loading
                 ? "Procesando pedido…"
                 : "Confirmar pedido y actualizar inventario"}
             </button>
           </div>
-        </div>
+        </section>
 
         {/* Historial */}
-        <div className="card pedido-card" style={{ marginTop: 24 }}>
-          <h2 className="pedido-title">Historial de pedidos</h2>
+        <section className="pedido-card">
+          <div className="pedido-card-header">
+            <div className="pedido-icon">📚</div>
+            <div>
+              <h2>Historial de pedidos</h2>
+              <p>
+                Consulta pedidos anteriores y genera un PDF con el detalle de cada uno.
+              </p>
+            </div>
+          </div>
 
           {(!proveedorId || historial.length === 0) && (
-            <p style={{ fontSize: 14, color: "#cbd5f5" }}>
+            <p className="pedido-helper-text">
               {proveedorId
                 ? "Este proveedor aún no tiene pedidos registrados."
                 : "Selecciona un proveedor para ver su historial de pedidos."}
@@ -1030,32 +1006,16 @@ export default function PedirMedicamentosProveedor() {
           )}
 
           {proveedorId && historial.length > 0 && (
-            <div style={{ overflowX: "auto" }}>
-              <table
-                style={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  fontSize: 13,
-                }}
-              >
+            <div className="table-wrap">
+              <table className="pedido-table">
                 <thead>
                   <tr>
-                    <th style={{ padding: 8, textAlign: "left" }}>Fecha</th>
-                    <th style={{ padding: 8, textAlign: "left" }}>
-                      Solicitado por
-                    </th>
-                    <th style={{ padding: 8, textAlign: "right" }}>
-                      Total existentes
-                    </th>
-                    <th style={{ padding: 8, textAlign: "right" }}>
-                      Total nuevos
-                    </th>
-                    <th style={{ padding: 8, textAlign: "right" }}>
-                      Total general
-                    </th>
-                    <th style={{ padding: 8, textAlign: "center" }}>
-                      Acciones
-                    </th>
+                    <th>Fecha</th>
+                    <th>Solicitado por</th>
+                    <th style={{ textAlign: "right" }}>Total existentes</th>
+                    <th style={{ textAlign: "right" }}>Total nuevos</th>
+                    <th style={{ textAlign: "right" }}>Total general</th>
+                    <th style={{ textAlign: "center" }}>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1072,50 +1032,28 @@ export default function PedirMedicamentosProveedor() {
 
                     return (
                       <tr key={idx}>
-                        <td style={{ padding: 8 }}>
-                          {new Date(p.fecha).toLocaleString()}
+                        <td>
+                          {new Date(p.fecha ?? p.Fecha).toLocaleString()}
                         </td>
-                        <td style={{ padding: 8 }}>
-                          {p.solicitadoPor || "Sin nombre"}
+                        <td>
+                          {p.solicitadoPor ??
+                            p.SolicitadoPor ??
+                            "Sin nombre"}
                         </td>
-                        <td
-                          style={{
-                            padding: 8,
-                            textAlign: "right",
-                          }}
-                        >
+                        <td style={{ textAlign: "right" }}>
                           ${totalExistentesPedido.toFixed(2)}
                         </td>
-                        <td
-                          style={{
-                            padding: 8,
-                            textAlign: "right",
-                          }}
-                        >
+                        <td style={{ textAlign: "right" }}>
                           ${totalNuevosPedido.toFixed(2)}
                         </td>
-                        <td
-                          style={{
-                            padding: 8,
-                            textAlign: "right",
-                          }}
-                        >
+                        <td style={{ textAlign: "right" }}>
                           ${totalGeneralPedido.toFixed(2)}
                         </td>
-                        <td
-                          style={{
-                            padding: 8,
-                            textAlign: "center",
-                          }}
-                        >
+                        <td style={{ textAlign: "center" }}>
                           <button
                             type="button"
-                            className="chip"
+                            className="btn-chip"
                             onClick={() => handleExportPedido(p)}
-                            style={{
-                              fontSize: 12,
-                              padding: "6px 10px",
-                            }}
                           >
                             📄 Ver / descargar PDF
                           </button>
@@ -1127,38 +1065,148 @@ export default function PedirMedicamentosProveedor() {
               </table>
             </div>
           )}
-        </div>
+        </section>
 
         {/* Estilos locales */}
         <style>{`
-          .pedido-card {
-            padding: 22px;
-            border-radius: 22px;
-            background: radial-gradient(circle at top left,#0f172a 0,#020617 55%);
-            border: 1px solid rgba(148,163,184,0.45);
-            box-shadow:
-              0 0 0 1px rgba(15,23,42,0.7),
-              0 18px 40px rgba(15,23,42,0.85);
-            color: #e5e7eb;
+          .pedido-page {
+            max-width: 1100px;
+            margin: 32px auto 40px;
+            padding: 0 18px;
+            color: #0f172a;
           }
 
-          .pedido-title {
-            margin: 0 0 8px 0;
+          .pedido-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 18px;
+          }
+
+          .pedido-header h1 {
+            margin: 0;
+            font-size: 28px;
+            color: #ffffff;
+          }
+
+          .pedido-header p {
+            margin: 4px 0 0;
+            font-size: 14px;
+            color: #FFFFFF;
+          }
+
+          .btn-secondary {
+            background: linear-gradient(90deg,#0ea5e9,#3b82f6);
+            color: #ffffff;
+            border: none;
+            padding: 9px 18px;
+            border-radius: 999px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 10px 22px rgba(37,99,235,0.35);
+          }
+
+          .btn-secondary:hover {
+            filter: brightness(1.05);
+            transform: translateY(-1px);
+          }
+
+          .pedido-card {
+            margin-bottom: 18px;
+            padding: 20px 20px 22px;
+            border-radius: 22px;
+            background: linear-gradient(145deg,#ffffff,#f1f5f9);
+            border: 1px solid rgba(148,163,184,0.55);
+            box-shadow:
+              0 0 0 1px rgba(148,163,184,0.15),
+              0 16px 40px rgba(15,23,42,0.12);
+          }
+
+          .pedido-card-header {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 12px;
+          }
+
+          .pedido-card-header h2 {
+            margin: 0;
             font-size: 20px;
-            color: #e5e7eb;
+            color: #111827;
+          }
+
+          .pedido-card-header p {
+            margin: 2px 0 0;
+            font-size: 13px;
+            color: #6b7280;
+          }
+
+          .pedido-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            background: radial-gradient(circle at 30% 20%, #4ade80, #2563eb);
+            color: #eff6ff;
+            box-shadow: 0 10px 20px rgba(37,99,235,0.45);
+          }
+
+          .pedido-field-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 12px;
           }
 
           .pedido-label {
-            display: block;
-            font-weight: 600;
-            margin-bottom: 4px;
             font-size: 13px;
-            color: #e5e7eb;
+            font-weight: 600;
+            color: #111827;
           }
 
           .pedido-help {
-            color: #cbd5f5;
-            font-size: 13px;
+            color: #6b7280;
+            font-size: 12px;
+          }
+
+          .pedido-field {
+            width: 100%;
+            padding: 9px 3px;
+            border-radius: 12px;
+            border: 1px solid #cbd5e1;
+            background: #ffffff;
+            font-size: 14px;
+            color: #0f172a;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s, transform 0.1s;
+          }
+
+          .pedido-field.textarea {
+            resize: vertical;
+          }
+
+          .pedido-field:focus {
+            border-color: #3b82f6;
+            box-shadow:
+              0 0 0 1px rgba(59,130,246,0.2),
+              0 0 0 4px rgba(191,219,254,0.75);
+            transform: translateY(-1px);
+          }
+
+          select.pedido-field {
+            appearance: none;
+            background-image:
+              linear-gradient(45deg, transparent 50%, #64748b 50%),
+              linear-gradient(135deg, #64748b 50%, transparent 50%);
+            background-position:
+              calc(100% - 14px) 10px,
+              calc(100% - 9px) 10px;
+            background-size: 5px 5px, 5px 5px;
+            background-repeat: no-repeat;
           }
 
           .grid2 {
@@ -1166,94 +1214,202 @@ export default function PedirMedicamentosProveedor() {
             grid-template-columns: 1fr 1fr;
             gap: 14px;
           }
+
           .grid3 {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
             gap: 14px;
           }
-          @media (max-width: 900px){
-            .grid2, .grid3 { grid-template-columns: 1fr; }
-          }
 
-          .pedido-field-wrap {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-          }
+          @media (max-width: 900px) {
+            .grid2,
+            .grid3 {
+              grid-template-columns: 1fr;
+            }
 
-          .pedido-field {
-            width: 100%;
-            padding: 10px 12px;
-            border-radius: 12px;
-            border: 1px solid #1d4ed8;
-            background: rgba(15,23,42,0.85);
-            outline: none;
-            font-size: 14px;
-            color: #f9fafb;
-            backdrop-filter: blur(18px);
-            transition: border-color 0.2s, box-shadow 0.2s, background 0.2s, transform 0.1s;
-          }
-
-          /* Para que los SELECT no queden texto blanco sobre blanco */
-          select.pedido-field {
-            background: rgba(15,23,42,0.95);
-            color: #f9fafb;
-          }
-          select.pedido-field option {
-            background: #020617;
-            color: #f9fafb;
-          }
-
-          .pedido-field:focus {
-            border-color: #38bdf8;
-            background: rgba(15,23,42,0.98);
-            box-shadow:
-              0 0 0 1px rgba(56,189,248,0.6),
-              0 0 0 6px rgba(30,64,175,0.6);
-            transform: translateY(-1px);
-          }
-
-          .pedido-chip {
-            padding: 10px 12px;
-            border-radius: 12px;
-            border: 1px solid rgba(148,163,184,0.6);
-            background: rgba(15,23,42,0.9);
-            font-size: 14px;
+            .pedido-header {
+              flex-direction: column;
+              align-items: flex-start;
+            }
           }
 
           .tab-row {
-            display: flex;
+            display: inline-flex;
             gap: 8px;
-            margin-bottom: 8px;
+            padding: 4px;
+            background: #e5edff;
+            border-radius: 999px;
+            margin-bottom: 12px;
           }
 
           .tab-btn {
-            flex: 1;
-            padding: 8px 10px;
+            border: none;
+            background: transparent;
+            padding: 7px 14px;
             border-radius: 999px;
-            border: 1px solid rgba(148,163,184,0.7);
-            background: rgba(15,23,42,0.9);
             font-size: 13px;
             font-weight: 500;
             cursor: pointer;
-            color: #e5e7eb;
-            transition: background 0.2s, color 0.2s, border-color 0.2s,
-              box-shadow 0.2s, transform 0.1s;
+            color: #475569;
           }
 
-          .tab-btn[data-active="true"] {
+          .tab-btn.active {
             background: linear-gradient(90deg,#2563eb,#22c55e);
-            border-color: #38bdf8;
             color: #f9fafb;
-            box-shadow: 0 10px 26px rgba(37,99,235,0.7);
+            box-shadow: 0 8px 20px rgba(37,99,235,0.55);
+          }
+
+          .pedido-form-grid {
+            margin-top: 8px;
+          }
+
+          .pedido-actions {
+            margin-top: 8px;
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+          }
+
+          .btn-primary {
+            background: linear-gradient(90deg,#2563eb,#1d4ed8);
+            color: #ffffff;
+            border: none;
+            padding: 9px 18px;
+            border-radius: 999px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 10px 22px rgba(37,99,235,0.4);
+          }
+
+          .btn-primary:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            box-shadow: none;
+          }
+
+          .btn-primary:hover:not(:disabled) {
+            filter: brightness(1.05);
             transform: translateY(-1px);
           }
 
-          .tab-btn[data-active="false"] {
-            color: #e5e7eb;
+          .btn-teal {
+            background: linear-gradient(90deg,#14b8a6,#0ea5e9);
+            color: #ffffff;
+            border: none;
+            padding: 10px 22px;
+            border-radius: 999px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 12px 26px rgba(20,184,166,0.45);
+          }
+
+          .btn-teal:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            box-shadow: none;
+          }
+
+          .btn-teal:hover:not(:disabled) {
+            filter: brightness(1.05);
+            transform: translateY(-1px);
+          }
+
+          .pedido-msg {
+            font-size: 13px;
+            margin-top: 10px;
+          }
+
+          .pedido-msg.ok {
+            color: #16a34a;
+          }
+
+          .pedido-msg.err {
+            color: #b91c1c;
+          }
+
+          .pill-info {
+            padding: 9px 11px;
+            border-radius: 12px;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            font-size: 13px;
+            color: #1f2933;
+          }
+
+          .table-wrap {
+            overflow-x: auto;
+            margin-top: 10px;
+          }
+
+          .pedido-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            background: #ffffff;
+            border-radius: 16px;
+            overflow: hidden;
+          }
+
+          .pedido-table th {
+            padding: 9px 8px;
+            text-align: left;
+            background: #e5edff;
+            color: #1f2937;
+            border-bottom: 1px solid #d1d5db;
+          }
+
+          .pedido-table td {
+            padding: 9px 8px;
+            border-bottom: 1px solid #e5e7eb;
+            color: #111827;
+          }
+
+          .pedido-empty {
+            text-align: center;
+            padding: 12px;
+            color: #94a3b8;
+          }
+
+          .pedido-total-label {
+            padding: 8px;
+            text-align: right;
+            font-weight: 600;
+            background: #f9fafb;
+          }
+
+          .pedido-total-value {
+            padding: 8px;
+            text-align: right;
+            font-weight: 700;
+            background: #f9fafb;
+          }
+
+          .btn-chip {
+            border: none;
+            background: #eff6ff;
+            color: #1d4ed8;
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(148,163,184,0.4);
+          }
+
+          .btn-chip:hover {
+            filter: brightness(1.04);
+            transform: translateY(-1px);
+          }
+
+          .pedido-helper-text {
+            font-size: 13px;
+            color: #6b7280;
+            margin: 4px 0 0;
           }
         `}</style>
-      </div>
+      </main>
     </>
   );
 }

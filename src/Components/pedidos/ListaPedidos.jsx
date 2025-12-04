@@ -156,10 +156,7 @@ export default function ListaPedidos() {
                 <NavLink to="/proveedores" className="admin-sublink">
                   Lista de proveedores
                 </NavLink>
-                <NavLink
-                  to="/proveedores/pedidos"
-                  className="admin-sublink"
-                >
+                <NavLink to="/proveedores/pedidos" className="admin-sublink">
                   Pedir medicamentos
                 </NavLink>
               </div>
@@ -193,81 +190,29 @@ export default function ListaPedidos() {
       </header>
 
       {/* ====== CONTENIDO PRINCIPAL ====== */}
-      <div style={{ maxWidth: 1150, margin: "26px auto", padding: "0 16px" }}>
+      <main className="pedidos-page">
         {/* TÍTULO, BOTÓN REGRESAR Y FILTROS */}
-        <header style={{ marginBottom: 16 }}>
-          <h2
-            style={{
-              margin: 0,
-              fontSize: 28,
-              color: "#e5e7eb",
-            }}
-          >
-            Pedidos de usuarios
-          </h2>
+        <header className="pedidos-header">
+          <div>
+            <h1>Pedidos de usuarios</h1>
+            <p>
+              Revisa los pedidos realizados desde el catálogo y actualiza su
+              estado.
+            </p>
+          </div>
 
           <button
             type="button"
+            className="btn-back"
             onClick={() => navigate(-1)}
-            style={{
-              marginTop: 8,
-              marginBottom: 12,
-              background: "linear-gradient(90deg,#2563eb,#1d4ed8)", // 💙 azul
-              color: "#f9fafb",
-              fontWeight: 600,
-              border: "none",
-              padding: "9px 20px",
-              borderRadius: 999,
-              cursor: "pointer",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "6px",
-              boxShadow: "0 10px 28px rgba(37,99,235,0.65)",
-              transition:
-                "background 0.2s, box-shadow 0.2s, transform 0.1s, filter 0.2s",
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.filter = "brightness(1.08)";
-              e.currentTarget.style.transform = "translateY(-1px)";
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.filter = "brightness(1)";
-              e.currentTarget.style.transform = "translateY(0)";
-            }}
           >
             ← Regresar
           </button>
+        </header>
 
-
-          <p
-            style={{
-              margin: 0,
-              color: "#cbd5f5",
-              fontSize: 14,
-            }}
-          >
-            Revisa los pedidos realizados desde el catálogo y cambia su estado.
-          </p>
-
-          {/* FILTROS */}
-          <div
-            style={{
-              display: "flex",
-              gap: 10,
-              alignItems: "center",
-              flexWrap: "wrap",
-              marginTop: 14,
-            }}
-          >
-            <label
-              style={{
-                fontSize: 14,
-                fontWeight: 600,
-                color: "#e5e7eb",
-              }}
-            >
-              Estado:
-            </label>
+        <section className="pedidos-filtros">
+          <div className="pedidos-filtros-left">
+            <span className="pedidos-filtros-label">Estado:</span>
 
             <select
               value={filtroEstado}
@@ -289,32 +234,44 @@ export default function ListaPedidos() {
               {cargando ? "Actualizando..." : "Actualizar"}
             </button>
           </div>
-        </header>
 
-        {/* TABLA DE PEDIDOS */}
+          <span className="pedidos-filtros-hint">
+            Filtra por estado para enfocarte en los pedidos que necesitas
+            revisar.
+          </span>
+        </section>
+
+        {/* TARJETA TABLA DE PEDIDOS */}
         <section className="pedidos-card">
+          <div className="pedidos-card-header">
+            <div className="pedidos-icon">🧾</div>
+            <div>
+              <h2>Listado de pedidos</h2>
+              <p>
+                Consulta el resumen de cada pedido, revisa sus productos y
+                cambia el estado con un clic.
+              </p>
+            </div>
+          </div>
+
           {error && (
             <div className="pedidos-alert pedidos-alert-error">{error}</div>
           )}
 
-          {msg && (
-            <div className="pedidos-alert pedidos-alert-ok">{msg}</div>
-          )}
+          {msg && <div className="pedidos-alert pedidos-alert-ok">{msg}</div>}
 
           {cargando && (
-            <p style={{ color: "#e5e7eb", marginTop: 6 }}>
-              Cargando pedidos…
-            </p>
+            <p className="pedidos-loading">Cargando pedidos…</p>
           )}
 
           {!cargando && pedidos.length === 0 && !error && (
-            <p style={{ color: "#9ca3af", marginTop: 6 }}>
+            <p className="pedidos-empty">
               No hay pedidos con el estado seleccionado.
             </p>
           )}
 
           {!cargando && pedidos.length > 0 && (
-            <div style={{ overflowX: "auto", marginTop: 6 }}>
+            <div className="pedidos-table-wrap">
               <table className="pedidos-table">
                 <thead>
                   <tr>
@@ -322,7 +279,7 @@ export default function ListaPedidos() {
                     <th>Fecha</th>
                     <th>Total</th>
                     <th>Estado</th>
-                    <th>Acciones</th>
+                    <th style={{ textAlign: "right" }}>Acciones</th>
                   </tr>
                 </thead>
 
@@ -335,9 +292,9 @@ export default function ListaPedidos() {
                         <td>{fmtMoneda(p.total)}</td>
                         <td>
                           <span
-                            className={`pedidos-status pedidos-status-${
-                              (p.estado || "Otros").toLowerCase()
-                            }`}
+                            className={`pedidos-status pedidos-status-${(
+                              p.estado || "otros"
+                            ).toLowerCase()}`}
                           >
                             {p.estado}
                           </span>
@@ -356,7 +313,9 @@ export default function ListaPedidos() {
                           {p.estado !== "Confirmado" && (
                             <button
                               className="pedidos-chip pedidos-chip-ok"
-                              onClick={() => cambiarEstado(p.id, "Confirmado")}
+                              onClick={() =>
+                                cambiarEstado(p.id, "Confirmado")
+                              }
                             >
                               ✅ Confirmar
                             </button>
@@ -365,7 +324,9 @@ export default function ListaPedidos() {
                           {p.estado !== "Rechazado" && (
                             <button
                               className="pedidos-chip pedidos-chip-bad"
-                              onClick={() => cambiarEstado(p.id, "Rechazado")}
+                              onClick={() =>
+                                cambiarEstado(p.id, "Rechazado")
+                              }
                             >
                               ❌ Rechazar
                             </button>
@@ -374,7 +335,9 @@ export default function ListaPedidos() {
                           {p.estado !== "Cancelado" && (
                             <button
                               className="pedidos-chip pedidos-chip-neutral"
-                              onClick={() => cambiarEstado(p.id, "Cancelado")}
+                              onClick={() =>
+                                cambiarEstado(p.id, "Cancelado")
+                              }
                             >
                               🛑 Cancelar
                             </button>
@@ -384,7 +347,7 @@ export default function ListaPedidos() {
 
                       {seleccionadoId === p.id && (
                         <tr className="pedidos-row-detalle">
-                          <td colSpan={6}>
+                          <td colSpan={5}>
                             {!p.detalles || p.detalles.length === 0 ? (
                               <p className="pedidos-detalle-empty">
                                 Sin detalles de productos.
@@ -392,11 +355,14 @@ export default function ListaPedidos() {
                             ) : (
                               <div>
                                 <p className="pedidos-detalle-title">
-                                  Productos:
+                                  Productos del pedido
                                 </p>
                                 <ul className="pedidos-detalle-list">
                                   {p.detalles.map((d, idx) => (
-                                    <li key={idx} className="pedidos-detalle-item">
+                                    <li
+                                      key={idx}
+                                      className="pedidos-detalle-item"
+                                    >
                                       <span>
                                         {d.medicamentoNombre ??
                                           d.MedicamentoNombre}{" "}
@@ -425,15 +391,115 @@ export default function ListaPedidos() {
 
         {/* ====== ESTILOS LOCALES ====== */}
         <style>{`
+          .pedidos-page {
+            max-width: 1150px;
+            margin: 28px auto 40px;
+            padding: 0 18px;
+            color: #0f172a;
+          }
+
+          .pedidos-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 14px;
+          }
+
+          .pedidos-header h1 {
+            margin: 0;
+            font-size: 28px;
+            color: #ffffff;
+          }
+
+          .pedidos-header p {
+            margin: 4px 0 0;
+            font-size: 14px;
+            color: #ffffff;
+          }
+
+          .btn-back {
+            background: linear-gradient(90deg,#0ea5e9,#3b82f6);
+            color: #ffffff;
+            border: none;
+            padding: 9px 18px;
+            border-radius: 999px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 10px 22px rgba(37,99,235,0.4);
+          }
+          .btn-back:hover {
+            filter: brightness(1.05);
+            transform: translateY(-1px);
+          }
+
+          .pedidos-filtros {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+          }
+
+          .pedidos-filtros-left {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+          }
+
+          .pedidos-filtros-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #111827;
+          }
+
+          .pedidos-filtros-hint {
+            font-size: 12px;
+            color: #9ca3af;
+          }
+
           .pedidos-card {
-            background: radial-gradient(circle at top left,#020617 0,#020617 50%,#000814 100%);
+            background: linear-gradient(145deg,#ffffff,#f3f4f6);
             border-radius: 22px;
             padding: 18px 20px 20px;
             border: 1px solid rgba(148,163,184,0.6);
             box-shadow:
-              0 0 0 1px rgba(15,23,42,0.9),
-              0 18px 40px rgba(15,23,42,0.9);
-            color: #e5e7eb;
+              0 0 0 1px rgba(148,163,184,0.18),
+              0 18px 40px rgba(15,23,42,0.15);
+          }
+
+          .pedidos-card-header {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+          }
+
+          .pedidos-card-header h2 {
+            margin: 0;
+            font-size: 20px;
+            color: #111827;
+          }
+
+          .pedidos-card-header p {
+            margin: 2px 0 0;
+            font-size: 13px;
+            color: #6b7280;
+          }
+
+          .pedidos-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            background: radial-gradient(circle at 30% 20%, #4ade80, #2563eb);
+            color: #f9fafb;
+            box-shadow: 0 10px 20px rgba(37,99,235,0.5);
           }
 
           .pedidos-alert {
@@ -441,131 +507,153 @@ export default function ListaPedidos() {
             padding: 8px 10px;
             margin-bottom: 10px;
             font-weight: 600;
-            font-size: 14px;
+            font-size: 13px;
           }
           .pedidos-alert-error {
-            background: rgba(239,68,68,0.12);
-            border: 1px solid rgba(248,113,113,0.9);
-            color: #fecaca;
+            background: rgba(248,113,113,0.1);
+            border: 1px solid rgba(220,38,38,0.75);
+            color: #b91c1c;
           }
           .pedidos-alert-ok {
-            background: rgba(22,163,74,0.12);
-            border: 1px solid rgba(52,211,153,0.9);
-            color: #bbf7d0;
+            background: rgba(34,197,94,0.12);
+            border: 1px solid rgba(22,163,74,0.8);
+            color: #166534;
+          }
+
+          .pedidos-loading {
+            margin: 4px 0 0;
+            font-size: 14px;
+            color: #4b5563;
+          }
+
+          .pedidos-empty {
+            margin: 4px 0 0;
+            font-size: 14px;
+            color: #9ca3af;
           }
 
           .pedidos-select {
             padding: 7px 12px;
             border-radius: 999px;
-            border: 1px solid rgba(148,163,184,0.8);
+            border: 1px solid #cbd5e1;
             font-size: 14px;
-            background: rgba(15,23,42,0.95);
-            color: #e5e7eb;
+            background: #ffffff;
+            color: #111827;
             outline: none;
-            backdrop-filter: blur(12px);
+            transition: border-color 0.2s, box-shadow 0.2s;
           }
-          .pedidos-select option {
-            background: #020617;
-            color: #f9fafb;
+          .pedidos-select:focus {
+            border-color: #3b82f6;
+            box-shadow:
+              0 0 0 1px rgba(59,130,246,0.2),
+              0 0 0 4px rgba(191,219,254,0.75);
           }
 
           .pedidos-refresh-btn {
-          padding: 8px 16px;
-          border-radius: 999px;
-          border: none;
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-          color: #f9fafb;
-          background: linear-gradient(90deg,#2563eb,#1d4ed8); /* 💙 azul */
-          box-shadow: 0 8px 20px rgba(37,99,235,0.6);
-          transition: filter 0.2s, transform 0.1s;
-        }
-        .pedidos-refresh-btn:hover:not(:disabled) {
-          filter: brightness(1.08);
-          transform: translateY(-1px);
-        }
-
+            padding: 8px 16px;
+            border-radius: 999px;
+            border: none;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            color: #f9fafb;
+            background: linear-gradient(90deg,#2563eb,#1d4ed8);
+            box-shadow: 0 8px 20px rgba(37,99,235,0.45);
+            transition: filter 0.2s, transform 0.1s;
+          }
+          .pedidos-refresh-btn:hover:not(:disabled) {
+            filter: brightness(1.07);
+            transform: translateY(-1px);
+          }
           .pedidos-refresh-btn:disabled {
-            opacity: 0.6;
+            opacity: 0.7;
             cursor: default;
             box-shadow: none;
+          }
+
+          .pedidos-table-wrap {
+            overflow-x: auto;
+            margin-top: 8px;
           }
 
           .pedidos-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 14px;
+            background: #ffffff;
+            border-radius: 18px;
+            overflow: hidden;
           }
+
           .pedidos-table thead tr {
-            background: linear-gradient(90deg,rgba(15,23,42,0.95),rgba(30,64,175,0.95));
+            background: #e5edff;
           }
           .pedidos-table th {
             padding: 10px 8px;
             text-align: left;
             font-weight: 600;
-            color: #e5e7eb;
-            border-bottom: 1px solid rgba(148,163,184,0.45);
+            color: #111827;
+            border-bottom: 1px solid #d1d5db;
           }
-          .pedidos-row-main td {
+          .pedidos-table td {
             padding: 9px 8px;
-            border-bottom: 1px solid rgba(30,64,175,0.35);
+            border-bottom: 1px solid #e5e7eb;
+            color: #111827;
           }
+
           .pedidos-row-main:nth-child(even) {
-            background: rgba(15,23,42,0.82);
-          }
-          .pedidos-row-main:nth-child(odd) {
-            background: rgba(15,23,42,0.75);
+            background: #f9fafb;
           }
 
           .pedidos-actions-cell {
-            padding: 8px 6px;
+            text-align: right;
+            padding-right: 10px;
             white-space: nowrap;
           }
 
           .pedidos-chip {
             border-radius: 999px;
-            border: 1px solid rgba(148,163,184,0.9);
+            border: 1px solid #cbd5e1;
             padding: 4px 10px;
             font-size: 12px;
-            background: rgba(15,23,42,0.9);
-            color: #e5e7eb;
+            background: #f9fafb;
+            color: #111827;
             cursor: pointer;
-            margin-right: 4px;
+            margin-left: 4px;
             margin-bottom: 4px;
             transition: background 0.2s, border-color 0.2s, transform 0.1s;
           }
           .pedidos-chip:hover {
-            background: rgba(30,64,175,0.9);
-            border-color: rgba(96,165,250,0.9);
+            background: #e5edff;
+            border-color: #93c5fd;
             transform: translateY(-1px);
           }
 
           .pedidos-chip-ok {
-            background: rgba(22,163,74,0.15);
-            border-color: rgba(74,222,128,0.85);
-            color: #bbf7d0;
+            background: #ecfdf3;
+            border-color: #4ade80;
+            color: #166534;
           }
           .pedidos-chip-ok:hover {
-            background: rgba(22,163,74,0.4);
+            background: #bbf7d0;
           }
 
           .pedidos-chip-bad {
-            background: rgba(220,38,38,0.15);
-            border-color: rgba(248,113,113,0.85);
-            color: #fecaca;
+            background: #fef2f2;
+            border-color: #f87171;
+            color: #b91c1c;
           }
           .pedidos-chip-bad:hover {
-            background: rgba(220,38,38,0.35);
+            background: #fecaca;
           }
 
           .pedidos-chip-neutral {
-            background: rgba(148,163,184,0.18);
-            border-color: rgba(148,163,184,0.85);
-            color: #e5e7eb;
+            background: #f3f4f6;
+            border-color: #9ca3af;
+            color: #374151;
           }
           .pedidos-chip-neutral:hover {
-            background: rgba(148,163,184,0.35);
+            background: #e5e7eb;
           }
 
           .pedidos-status {
@@ -575,31 +663,29 @@ export default function ListaPedidos() {
             font-weight: 600;
           }
           .pedidos-status-pendiente {
-            background: rgba(252,211,77,0.16);
-            color: #facc15;
-            border: 1px solid rgba(234,179,8,0.8);
+            background: #fef9c3;
+            color: #854d0e;
+            border: 1px solid #facc15;
           }
           .pedidos-status-confirmado {
-            background: rgba(34,197,94,0.18);
-            color: #bbf7d0;
-            border: 1px solid rgba(52,211,153,0.9);
+            background: #dcfce7;
+            color: #166534;
+            border: 1px solid #4ade80;
           }
           .pedidos-status-rechazado {
-            background: rgba(248,113,113,0.16);
-            color: #fecaca;
-            border: 1px solid rgba(248,113,113,0.9);
+            background: #fee2e2;
+            color: #b91c1c;
+            border: 1px solid #f87171;
           }
           .pedidos-status-cancelado {
-            background: rgba(148,163,184,0.24);
-            color: #e5e7eb;
-            border: 1px solid rgba(148,163,184,0.9);
+            background: #e5e7eb;
+            color: #374151;
+            border: 1px solid #9ca3af;
           }
 
           .pedidos-row-detalle td {
-            padding: 8px 10px 10px;
-            background: radial-gradient(circle at top left,#020617,#020617 60%,#020617);
-            border-bottom-left-radius: 12px;
-            border-bottom-right-radius: 12px;
+            padding: 10px 12px 12px;
+            background: #f9fafb;
           }
 
           .pedidos-detalle-empty {
@@ -611,7 +697,7 @@ export default function ListaPedidos() {
             margin: 0 0 6px;
             font-size: 13px;
             font-weight: 600;
-            color: #e5e7eb;
+            color: #111827;
           }
           .pedidos-detalle-list {
             list-style: none;
@@ -623,16 +709,20 @@ export default function ListaPedidos() {
             display: flex;
             justify-content: space-between;
             padding: 2px 0;
-            color: #e5e7eb;
+            color: #111827;
           }
 
           @media (max-width: 768px) {
+            .pedidos-header {
+              flex-direction: column;
+              align-items: flex-start;
+            }
             .pedidos-actions-cell {
               white-space: normal;
             }
           }
         `}</style>
-      </div>
+      </main>
     </>
   );
 }

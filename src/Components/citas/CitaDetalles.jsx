@@ -1,3 +1,4 @@
+// src/Components/citas/CitaDetalles.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getCitaById, actualizarCita } from "./services/citasApi";
@@ -10,18 +11,15 @@ export default function CitaDetalles() {
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
 
-  // 🔹 Nuevos estados para el mini-form
   const [observaciones, setObservaciones] = useState("");
   const [diagnostico, setDiagnostico] = useState("");
   const [medicamentos, setMedicamentos] = useState("");
 
   useEffect(() => {
-    const cargarCita = async () => {
+    const cargar = async () => {
       try {
         const data = await getCitaById(idCita);
         setCita(data);
-
-        // Rellenar con lo que ya tenga la cita (por si ya la atendieron antes)
         setObservaciones(data.observaciones || "");
         setDiagnostico(data.diagnostico || "");
         setMedicamentos(data.medicamentos || "");
@@ -31,12 +29,10 @@ export default function CitaDetalles() {
         setLoading(false);
       }
     };
-
-    cargarCita();
+    cargar();
   }, [idCita]);
 
-  // 🔹 Guardar diagnóstico y marcar como atendida
-  const handleAtendida = async (e) => {
+  const handleGuardar = async (e) => {
     e.preventDefault();
     if (!cita) return;
 
@@ -52,9 +48,8 @@ export default function CitaDetalles() {
         medicamentos,
       });
 
-      setMsg("Cita marcada como atendida y guardado el diagnóstico.");
+      setMsg("Cita marcada como terminada y diagnóstico guardado.");
 
-      // Actualizar estado local
       setCita((prev) => ({
         ...prev,
         estatus: "T",
@@ -63,189 +58,341 @@ export default function CitaDetalles() {
         medicamentos,
       }));
     } catch (e) {
-      setMsg(e.message || "No se pudo actualizar el estatus.");
+      setMsg(e.message || "No se pudo actualizar la cita.");
     }
   };
 
+  const getEstatusTexto = (e) => {
+    if (e === "A") return "Activa";
+    if (e === "C") return "Cancelada";
+    if (e === "T") return "Terminada";
+    return "Desconocido";
+  };
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          maxWidth: 1100,
+          margin: "40px auto",
+          padding: "0 16px",
+          color: "#e5e7eb",
+        }}
+      >
+        Cargando…
+      </div>
+    );
+  }
+
+  if (!cita) {
+    return (
+      <div
+        style={{
+          maxWidth: 1100,
+          margin: "40px auto",
+          padding: "0 16px",
+          color: "#e5e7eb",
+        }}
+      >
+        No se encontró la cita.
+      </div>
+    );
+  }
+
+  const fechaTexto = new Date(cita.fechaHora).toLocaleString();
+
+  const estatusEsActiva = cita.estatus === "A";
+
   return (
-    <>
-      {/* 🔹 Topbar simple */}
-      <header className="admin-menu">
-        <div className="admin-left">
-          <div className="admin-logo">
-            <span className="logo-badge">⚕</span>
-            <div className="logo-text">
-              <span className="logo-title">Farmacia</span>
-              <span className="logo-subtitle">Panel administrador</span>
-            </div>
-          </div>
-        </div>
-      </header>
+    <div
+      style={{
+        maxWidth: 1100,
+        margin: "32px auto",
+        padding: "0 16px",
+      }}
+    >
+      {/* Título */}
+      <h2
+        style={{
+          fontSize: 28,
+          color: "#e5e7eb",
+          marginBottom: 4,
+        }}
+      >
+        Detalles de la cita
+      </h2>
 
-      <div style={{ maxWidth: 1100, margin: "24px auto", padding: "0 16px" }}>
-        <h2>Detalles de la cita</h2>
+      {/* Botón regresar estilo azul */}
+      <button
+        type="button"
+        onClick={() => nav(-1)}
+        className="chip"
+        style={{
+          marginTop: "4px",
+          marginBottom: "24px",
+          background: "linear-gradient(90deg, #2563eb, #1d4ed8)",
+          color: "#fff",
+          fontWeight: 600,
+          border: "none",
+          padding: "9px 18px",
+          borderRadius: "999px",
+          cursor: "pointer",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "6px",
+          boxShadow: "0 4px 14px rgba(37,99,235,0.35)",
+        }}
+      >
+        ← Regresar
+      </button>
 
-        {/* Botón de regreso */}
-        <button
-          type="button"
-          onClick={() => nav("/citas")}
-          className="chip"
+      {msg && (
+        <div
           style={{
-            marginTop: "6px",
-            marginBottom: "14px",
-            background: "linear-gradient(90deg, #22c55e, #16a34a)",
-            color: "#fff",
-            fontWeight: 600,
-            border: "none",
-            padding: "10px 18px",
-            borderRadius: "12px",
-            cursor: "pointer",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "6px",
-            boxShadow: "0 4px 14px rgba(16,185,129,0.25)",
+            marginBottom: 16,
+            background: "#ecfdf5",
+            border: "1px solid #bbf7d0",
+            padding: 10,
+            borderRadius: 14,
+            fontSize: 14,
+            color: "#166534",
           }}
         >
-          ← Regresar
-        </button>
+          {msg}
+        </div>
+      )}
 
-        {/* Mensajes */}
-        {msg && (
-          <p
-            style={{
-              background: "#f7fffe",
-              border: "1px solid #d6e7e6",
-              padding: 10,
-              borderRadius: 12,
-              marginBottom: 12,
-            }}
-          >
-            {msg}
-          </p>
-        )}
-
-        {loading || !cita ? (
-          <p>Cargando...</p>
-        ) : (
+      {/* TARJETA BLANCA, ESTILO AGENDAR CITA */}
+      <article
+        className="module-card"
+        style={{
+          maxWidth: 900,
+          margin: "0 auto 40px", // 👈 espacio abajo
+          background:
+            "linear-gradient(145deg, rgba(255,255,255,0.98), rgba(239,246,255,0.99))",
+          padding: 26,
+          borderRadius: 28,
+          border: "1px solid rgba(191, 219, 254, 0.8)",
+          boxShadow:
+            "0 0 0 1px rgba(37,99,235,0.10), 0 20px 50px rgba(15,23,42,0.55)",
+          color: "#0f172a",
+        }}
+      >
+        {/* Encabezado paciente/fecha */}
+        <header
+          style={{
+            display: "flex",
+            gap: 16,
+            alignItems: "center",
+            marginBottom: 18,
+          }}
+        >
           <div
-            className="module-card"
             style={{
-              padding: 16,
-              backgroundColor: "#fff",
-              borderRadius: 12,
-              boxShadow: "0 4px 14px rgba(0,0,0,0.1)",
+              width: 56,
+              height: 56,
+              borderRadius: "999px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background:
+                "radial-gradient(circle at 30% 20%, #4ade80, #2563eb)",
+              color: "#eff6ff",
+              boxShadow: "0 10px 24px rgba(37,99,235,0.45)",
+              fontSize: 28,
             }}
           >
-            <div className="module-icon" style={{ fontSize: "24px" }}>
-              🗓️
-            </div>
+            🗓️
+          </div>
 
-            <strong>{new Date(cita.fechaHora).toLocaleString()}</strong>
-
-            <div style={{ color: "var(--muted)", marginTop: 8 }}>
-              Paciente: <b>{cita.nombrePaciente || "Sin nombre"}</b>
-              <br />
-              Tipo de consulta: <b>{cita.tipoConsulta}</b>
-              <br />
-              Notas: {cita.notas || "Sin notas"}
-              <br />
-              Estatus:{" "}
-              <b>
-                {cita.estatus === "A"
-                  ? "Activa"
-                  : cita.estatus === "C"
-                  ? "Cancelada"
-                  : "Terminada"}
-              </b>
-            </div>
-
-            {/* 🔹 Mini-formulario de atención */}
-            <form
-              onSubmit={handleAtendida}
+          <div>
+            <h3 style={{ margin: 0, fontSize: 22 }}>
+              Paciente{" "}
+              <span style={{ fontWeight: 700 }}>
+                {cita.nombrePaciente || "sin nombre"}
+              </span>
+            </h3>
+            <p
               style={{
-                marginTop: 16,
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
+                margin: "4px 0 0",
+                fontSize: 14,
+                color: "#6b7280",
               }}
             >
-              <div>
-                <label style={{ fontWeight: 600 }}>Observaciones</label>
-                <textarea
-                  value={observaciones}
-                  onChange={(e) => setObservaciones(e.target.value)}
-                  rows={3}
-                  style={{
-                    width: "100%",
-                    marginTop: 4,
-                    padding: 8,
-                    borderRadius: 10,
-                    border: "1px solid #d4d4d4",
-                    resize: "vertical",
-                  }}
-                  disabled={cita.estatus !== "A"}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontWeight: 600 }}>Diagnóstico</label>
-                <textarea
-                  value={diagnostico}
-                  onChange={(e) => setDiagnostico(e.target.value)}
-                  rows={3}
-                  style={{
-                    width: "100%",
-                    marginTop: 4,
-                    padding: 8,
-                    borderRadius: 10,
-                    border: "1px solid #d4d4d4",
-                    resize: "vertical",
-                  }}
-                  disabled={cita.estatus !== "A"}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontWeight: 600 }}>Medicamentos indicados</label>
-                <textarea
-                  value={medicamentos}
-                  onChange={(e) => setMedicamentos(e.target.value)}
-                  rows={3}
-                  style={{
-                    width: "100%",
-                    marginTop: 4,
-                    padding: 8,
-                    borderRadius: 10,
-                    border: "1px solid #d4d4d4",
-                    resize: "vertical",
-                  }}
-                  placeholder="Ej. Paracetamol 500 mg cada 8h por 3 días"
-                  disabled={cita.estatus !== "A"}
-                />
-              </div>
-
-              {cita.estatus === "A" && (
-                <button
-                  type="submit"
-                  style={{
-                    background: "#fbbf24",
-                    color: "#fff",
-                    padding: "10px 18px",
-                    borderRadius: "12px",
-                    cursor: "pointer",
-                    marginTop: "4px",
-                    border: "none",
-                    fontWeight: 600,
-                    alignSelf: "flex-start",
-                  }}
-                >
-                  Marcar como Atendida y Guardar
-                </button>
-              )}
-            </form>
+              {fechaTexto}
+            </p>
           </div>
-        )}
-      </div>
-    </>
+        </header>
+
+        {/* Datos generales de la cita (texto plano) */}
+        <section
+          style={{
+            marginBottom: 18,
+            fontSize: 14,
+            color: "#111827",
+          }}
+        >
+          <p style={{ margin: "0 0 6px" }}>
+            <span style={{ fontWeight: 600 }}>Tipo de consulta:</span>{" "}
+            <span style={{ fontWeight: 700 }}>
+              {cita.tipoConsulta || "General"}
+            </span>
+          </p>
+
+          <p style={{ margin: "0 0 6px" }}>
+            <span style={{ fontWeight: 600 }}>Notas:</span>{" "}
+            {cita.notas || "Sin notas"}
+          </p>
+
+          <p style={{ margin: 0 }}>
+            <span style={{ fontWeight: 600 }}>Estatus:</span>{" "}
+            <span
+              style={{
+                fontWeight: 700,
+                color:
+                  cita.estatus === "A"
+                    ? "#16a34a"
+                    : cita.estatus === "C"
+                    ? "#b91c1c"
+                    : "#2563eb",
+              }}
+            >
+              {getEstatusTexto(cita.estatus)}
+            </span>
+          </p>
+        </section>
+
+        <hr
+          style={{
+            border: "none",
+            height: 1,
+            background:
+              "linear-gradient(to right, rgba(148,163,184,0.1), rgba(148,163,184,0.7), rgba(148,163,184,0.1))",
+            marginBottom: 18,
+          }}
+        />
+
+        {/* FORM de observaciones / diagnóstico */}
+        <form
+          onSubmit={handleGuardar}
+          style={{ display: "grid", gap: 14 }}
+        >
+          {/* Cada textarea azul clarito con texto oscuro */}
+          <div>
+            <label
+              style={{
+                fontWeight: 600,
+                fontSize: 14,
+                color: "#0f172a",
+              }}
+            >
+              Observaciones
+            </label>
+            <textarea
+              value={observaciones}
+              onChange={(e) => setObservaciones(e.target.value)}
+              rows={3}
+              disabled={!estatusEsActiva}
+              style={{
+                width: "100%",
+                marginTop: 4,
+                padding: 10,
+                borderRadius: 16,
+                border: "1px solid #93c5fd",
+                backgroundColor: "#e0edff",
+                color: "#111827",
+                resize: "vertical",
+                fontSize: 14,
+                outline: "none",
+              }}
+            />
+          </div>
+
+          <div>
+            <label
+              style={{
+                fontWeight: 600,
+                fontSize: 14,
+                color: "#0f172a",
+              }}
+            >
+              Diagnóstico
+            </label>
+            <textarea
+              value={diagnostico}
+              onChange={(e) => setDiagnostico(e.target.value)}
+              rows={3}
+              disabled={!estatusEsActiva}
+              style={{
+                width: "100%",
+                marginTop: 4,
+                padding: 10,
+                borderRadius: 16,
+                border: "1px solid #93c5fd",
+                backgroundColor: "#e0edff",
+                color: "#111827",
+                resize: "vertical",
+                fontSize: 14,
+                outline: "none",
+              }}
+            />
+          </div>
+
+          <div>
+            <label
+              style={{
+                fontWeight: 600,
+                fontSize: 14,
+                color: "#0f172a",
+              }}
+            >
+              Medicamentos indicados
+            </label>
+            <textarea
+              value={medicamentos}
+              onChange={(e) => setMedicamentos(e.target.value)}
+              rows={3}
+              disabled={!estatusEsActiva}
+              placeholder="Ej. Paracetamol 500 mg cada 8h por 3 días"
+              style={{
+                width: "100%",
+                marginTop: 4,
+                padding: 10,
+                borderRadius: 16,
+                border: "1px solid #93c5fd",
+                backgroundColor: "#e0edff",
+                color: "#111827",
+                resize: "vertical",
+                fontSize: 14,
+                outline: "none",
+              }}
+            />
+          </div>
+
+          {/* Botón guardar tipo barra azul, como Agendar cita */}
+          <button
+            type="submit"
+            disabled={!estatusEsActiva}
+            style={{
+              marginTop: 8,
+              padding: "12px 20px",
+              borderRadius: 999,
+              border: "none",
+              fontWeight: 600,
+              fontSize: 15,
+              cursor: estatusEsActiva ? "pointer" : "not-allowed",
+              background:
+                "linear-gradient(90deg, rgba(37,99,235,1), rgba(59,130,246,1))",
+              color: "#ffffff",
+              boxShadow: "0 10px 30px rgba(37,99,235,0.55)",
+            }}
+          >
+            {estatusEsActiva
+              ? "Marcar como terminada y guardar diagnóstico"
+              : "La cita ya no está activa"}
+          </button>
+        </form>
+      </article>
+    </div>
   );
 }

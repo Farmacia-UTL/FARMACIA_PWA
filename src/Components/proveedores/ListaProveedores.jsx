@@ -26,6 +26,19 @@ export default function ListaProveedores() {
   const [msg, setMsg] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const nombreAdmin =
+    localStorage.getItem("nombreUsuario") ||
+    localStorage.getItem("userName") ||
+    localStorage.getItem("userEmail") ||
+    "Administrador";
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("rol");
+    localStorage.removeItem("nombreUsuario");
+    navigate("/login");
+  };
+
   /* ================= CARGAR ================= */
   const cargarProveedores = async () => {
     try {
@@ -65,11 +78,15 @@ export default function ListaProveedores() {
     setEditId(p.id);
     setMsg("");
     setEditForm({ ...p });
+    window.scrollTo({ top: document.body.scrollHeight / 2, behavior: "smooth" });
   };
 
   const onChangeEdit = (e) => {
     const { name, type, checked, value } = e.target;
-    setEditForm((s) => ({ ...s, [name]: type === "checkbox" ? checked : value }));
+    setEditForm((s) => ({
+      ...s,
+      [name]: type === "checkbox" ? checked : value,
+    }));
   };
 
   const onSubmitEdit = async (e) => {
@@ -133,57 +150,99 @@ export default function ListaProveedores() {
           <div className="admin-logo">
             <span className="logo-badge" />
             <div className="logo-text">
-              <span className="logo-title">Farmacia</span>
-              <span className="logo-subtitle">Panel administrador</span>
+              <span className="logo-title">Farmacia · Admin</span>
+              <span className="logo-subtitle">Gestión de proveedores</span>
             </div>
           </div>
 
           <nav className="admin-nav">
-            <NavLink className="admin-link" to="/inicioAdmin">Inicio</NavLink>
+            <NavLink className="admin-link" to="/inicioAdmin">
+              Inicio
+            </NavLink>
 
             <div className="admin-dropdown">
               <span className="admin-link">Medicamentos ▾</span>
               <div className="admin-dropdown-content">
-                <NavLink to="/medicamentos/agregar" className="admin-sublink">Agregar</NavLink>
-                <NavLink to="/medicamentos/inventario" className="admin-sublink">Inventario</NavLink>
+                <NavLink
+                  to="/medicamentos/agregar"
+                  className="admin-sublink"
+                >
+                  Agregar
+                </NavLink>
+                <NavLink
+                  to="/medicamentos/inventario"
+                  className="admin-sublink"
+                >
+                  Inventario
+                </NavLink>
               </div>
             </div>
 
             <div className="admin-dropdown">
               <span className="admin-link">Proveedores ▾</span>
               <div className="admin-dropdown-content">
-                <NavLink to="/proveedores/crear" className="admin-sublink">Registrar</NavLink>
-                <NavLink to="/proveedores" className="admin-sublink">Lista</NavLink>
-                <NavLink to="/proveedores/pedidos" className="admin-sublink">Pedidos</NavLink>
+                <NavLink to="/proveedores/crear" className="admin-sublink">
+                  Registrar
+                </NavLink>
+                <NavLink to="/proveedores" className="admin-sublink">
+                  Lista
+                </NavLink>
+                <NavLink
+                  to="/proveedores/pedidos"
+                  className="admin-sublink"
+                >
+                  Pedidos
+                </NavLink>
               </div>
             </div>
 
-            <NavLink className="admin-link" to="/pedidos">Pedidos</NavLink>
-            <NavLink className="admin-link" to="/citas">Citas</NavLink>
+            <NavLink className="admin-link" to="/pedidos">
+              Pedidos
+            </NavLink>
+            <NavLink className="admin-link" to="/citas">
+              Citas
+            </NavLink>
           </nav>
         </div>
 
         <div className="admin-right">
-          <button className="btn-ghost logout-btn" onClick={() => navigate("/")}>Cerrar sesión</button>
+          <span className="admin-tag">Rol: Admin · {nombreAdmin}</span>
+          <button className="btn-ghost logout-btn" onClick={handleLogout}>
+            Cerrar sesión
+          </button>
         </div>
       </header>
 
       {/* ============ CONTENIDO ============ */}
-      <div className="prov-wrap">
-        <div className="prov-header">
-          <h1>Lista de proveedores</h1>
+      <main className="prov-wrap">
+        {/* Título + regresar */}
+        <div className="prov-top">
+          <div>
+            <h1 className="prov-title">Lista de proveedores</h1>
+            <p className="prov-sub">
+              Consulta, edita y administra los proveedores registrados en la
+              farmacia.
+            </p>
+          </div>
 
-          <NavLink to="/proveedores/crear" className="btn-blue">
-            + Registrar proveedor
-          </NavLink>
+          <button className="prov-back" onClick={() => navigate(-1)}>
+            ← Regresar
+          </button>
         </div>
 
-        {/* ============ TABLA ============ */}
-        <div className="prov-card">
-          {cargando && <p>Cargando…</p>}
+        {/* ============ CARD TABLA BLANCA ============ */}
+        <section className="prov-card prov-card--table">
+          <div className="prov-card-header">
+            <h2 className="prov-card-title">Proveedores registrados</h2>
+            <NavLink to="/proveedores/crear" className="btn-blue">
+              + Registrar proveedor
+            </NavLink>
+          </div>
+
+          {cargando && <p className="muted">Cargando…</p>}
           {error && <p className="error">{error}</p>}
 
-          {!cargando && proveedores.length === 0 && (
+          {!cargando && proveedores.length === 0 && !error && (
             <p className="muted">No hay proveedores registrados.</p>
           )}
 
@@ -197,7 +256,7 @@ export default function ListaProveedores() {
                     <th>Teléfono</th>
                     <th>Email</th>
                     <th>Estado</th>
-                    <th style={{textAlign:"center"}}>Acciones</th>
+                    <th style={{ textAlign: "center" }}>Acciones</th>
                   </tr>
                 </thead>
 
@@ -205,17 +264,33 @@ export default function ListaProveedores() {
                   {proveedores.map((p) => (
                     <tr key={p.id}>
                       <td>{p.nombre}</td>
-                      <td>{p.contacto}</td>
-                      <td>{p.telefono}</td>
-                      <td>{p.email}</td>
+                      <td>{p.contacto || "—"}</td>
+                      <td>{p.telefono || "—"}</td>
+                      <td>{p.email || "—"}</td>
                       <td>
-                        <span className={`pill ${p.activo ? "pill-ok" : "pill-off"}`}>
+                        <span
+                          className={`pill ${
+                            p.activo ? "pill-ok" : "pill-off"
+                          }`}
+                        >
                           {p.activo ? "Activo" : "Inactivo"}
                         </span>
                       </td>
                       <td className="actions">
-                        <button className="btn-mini" onClick={() => seleccionarParaEditar(p)}>Editar</button>
-                        <button className="btn-mini danger" onClick={() => eliminarProveedor(p.id)}>Eliminar</button>
+                        <button
+                          className="btn-mini"
+                          type="button"
+                          onClick={() => seleccionarParaEditar(p)}
+                        >
+                          ✏️ Editar
+                        </button>
+                        <button
+                          className="btn-mini danger"
+                          type="button"
+                          onClick={() => eliminarProveedor(p.id)}
+                        >
+                          🗑 Eliminar
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -223,53 +298,90 @@ export default function ListaProveedores() {
               </table>
             </div>
           )}
-        </div>
+        </section>
 
-        {/* ============ FORMULARIO EDICIÓN ============ */}
-        <div className="prov-card">
-          <h2 className="sub">Editar proveedor</h2>
-          {!editId && <p className="muted">Selecciona un proveedor en la tabla.</p>}
+        {/* ============ CARD EDICIÓN BLANCA ============ */}
+        <section className="prov-card">
+          <h2 className="prov-card-title">Editar proveedor</h2>
+          {!editId && (
+            <p className="muted">
+              Selecciona un proveedor en la tabla para modificar sus datos.
+            </p>
+          )}
 
           {editId && (
             <form className="edit-form" onSubmit={onSubmitEdit}>
               <div className="grid2">
                 <div className="field">
                   <label>Empresa</label>
-                  <input name="nombre" value={editForm.nombre} onChange={onChangeEdit} required />
+                  <input
+                    name="nombre"
+                    value={editForm.nombre}
+                    onChange={onChangeEdit}
+                    required
+                  />
                 </div>
 
                 <div className="field">
                   <label>Contacto</label>
-                  <input name="contacto" value={editForm.contacto} onChange={onChangeEdit} />
+                  <input
+                    name="contacto"
+                    value={editForm.contacto}
+                    onChange={onChangeEdit}
+                  />
                 </div>
               </div>
 
               <div className="grid2">
                 <div className="field">
                   <label>Teléfono</label>
-                  <input name="telefono" value={editForm.telefono} onChange={onChangeEdit} />
+                  <input
+                    name="telefono"
+                    value={editForm.telefono}
+                    onChange={onChangeEdit}
+                  />
                 </div>
 
                 <div className="field">
                   <label>Email</label>
-                  <input type="email" name="email" value={editForm.email} onChange={onChangeEdit} />
+                  <input
+                    type="email"
+                    name="email"
+                    value={editForm.email}
+                    onChange={onChangeEdit}
+                  />
                 </div>
               </div>
 
               <div className="field">
                 <label>Dirección</label>
-                <textarea rows={2} name="direccion" value={editForm.direccion} onChange={onChangeEdit} />
+                <textarea
+                  rows={2}
+                  name="direccion"
+                  value={editForm.direccion}
+                  onChange={onChangeEdit}
+                />
               </div>
 
               <div className="grid2">
                 <div className="field">
                   <label>RFC</label>
-                  <input name="rfc" value={editForm.rfc} onChange={onChangeEdit} />
+                  <input
+                    name="rfc"
+                    value={editForm.rfc}
+                    onChange={onChangeEdit}
+                  />
                 </div>
 
                 <div className="field check">
-                  <input type="checkbox" name="activo" checked={editForm.activo} onChange={onChangeEdit} />
-                  <label>Activo</label>
+                  <input
+                    type="checkbox"
+                    id="activo"
+                    name="activo"
+                    checked={editForm.activo}
+                    onChange={onChangeEdit}
+                  />
+                  <label htmlFor="activo">Proveedor activo</label>
                 </div>
               </div>
 
@@ -280,69 +392,145 @@ export default function ListaProveedores() {
               {msg && <p className="msg">{msg}</p>}
             </form>
           )}
-        </div>
-      </div>
+        </section>
+      </main>
 
       {/* ============ CSS ============ */}
       <style>{`
         .prov-wrap {
           max-width: 1100px;
-          margin: 34px auto;
-          padding: 0 20px;
-          color: #e5e7eb;
+          margin: 34px auto 40px;
+          padding: 0 20px 10px;
+          color: #0f172a;
         }
 
-        .prov-header {
+        .prov-top {
           display: flex;
           justify-content: space-between;
-          align-items: center;
+          align-items: flex-start;
+          gap: 12px;
           margin-bottom: 18px;
         }
 
-        .btn-blue {
+        .prov-title {
+          font-size: 28px;
+          font-weight: 700;
+          margin: 0 0 4px;
+          color: #e5f0ff;
+        }
+
+        .prov-sub {
+          margin: 0;
+          font-size: 14px;
+          color: #cbd5e1;
+        }
+
+        .prov-back {
           background: linear-gradient(90deg, #0ea5e9, #3b82f6);
+          color: white;
+          border: none;
+          padding: 8px 22px;
+          border-radius: 999px;
+          cursor: pointer;
+          font-weight: 600;
+          box-shadow: 0 10px 24px rgba(8,47,73,0.55);
+          align-self: flex-start;
+        }
+
+        .prov-back:hover {
+          filter: brightness(1.07);
+          transform: translateY(-1px);
+        }
+
+        .prov-card {
+          max-width: 1100px;
+          margin: 0 auto 22px;
+          background: linear-gradient(
+            145deg,
+            rgba(255,255,255,0.99),
+            rgba(239,246,255,0.99)
+          );
+          border-radius: 24px;
+          border: 1px solid rgba(191,219,254,0.9);
+          box-shadow:
+            0 0 0 1px rgba(148,163,184,0.35),
+            0 18px 40px rgba(15,23,42,0.45);
+          padding: 22px 24px;
+          color: #0f172a;
+        }
+
+        .prov-card--table {
+          margin-bottom: 26px;
+        }
+
+        .prov-card-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 12px;
+        }
+
+        .prov-card-title {
+          font-size: 20px;
+          font-weight: 700;
+          margin: 0;
+          color: #1e293b;
+        }
+
+        .btn-blue {
+          background: linear-gradient(90deg, #2563eb, #1d4ed8);
           padding: 8px 18px;
-          border-radius: 12px;
+          border-radius: 999px;
           color: white;
           text-decoration: none;
           font-weight: 600;
-          box-shadow: 0 10px 26px rgba(8,47,73,0.5);
+          border: none;
+          cursor: pointer;
+          box-shadow: 0 10px 26px rgba(37,99,235,0.5);
+          font-size: 14px;
         }
 
-        .btn-blue:hover { filter: brightness(1.1); }
-
-        .prov-card {
-          background: rgba(15,23,42,0.92);
-          border: 1px solid rgba(148,163,184,0.45);
-          backdrop-filter: blur(12px);
-          padding: 22px;
-          border-radius: 18px;
-          margin-bottom: 22px;
-          box-shadow: 0 16px 34px rgba(0,0,0,0.4);
+        .btn-blue:hover {
+          filter: brightness(1.06);
+          transform: translateY(-1px);
         }
 
         .prov-table-wrap {
           overflow-x: auto;
+          margin-top: 6px;
         }
 
         .prov-table {
           width: 100%;
           border-collapse: collapse;
-          color: #f8fafc;
+          color: #0f172a;
+          font-size: 14px;
+        }
+
+        .prov-table thead tr {
+          background: linear-gradient(
+            90deg,
+            rgba(219,234,254,1),
+            rgba(191,219,254,1)
+          );
         }
 
         .prov-table th {
           padding: 10px 8px;
           text-align: left;
-          background: rgba(56,189,248,0.12);
-          color: #a5d8ff;
-          font-weight: 600;
-          border-bottom: 1px solid rgba(255,255,255,0.1);
+          color: #1e3a8a;
+          font-weight: 700;
+          border-bottom: 1px solid rgba(148,163,184,0.5);
         }
 
         .prov-table td {
           padding: 10px 8px;
-          border-bottom: 1px solid rgba(255,255,255,0.08);
+          border-bottom: 1px solid rgba(203,213,225,0.8);
+        }
+
+        .prov-table tbody tr:hover {
+          background: rgba(219,234,254,0.45);
         }
 
         .pill {
@@ -353,38 +541,48 @@ export default function ListaProveedores() {
         }
 
         .pill-ok {
-          background: rgba(34,197,94,0.25);
-          color: #4ade80;
+          background: rgba(22,163,74,0.1);
+          color: #15803d;
+          border: 1px solid rgba(22,163,74,0.3);
         }
 
         .pill-off {
-          background: rgba(248,113,113,0.25);
-          color: #f87171;
+          background: rgba(239,68,68,0.08);
+          color: #b91c1c;
+          border: 1px solid rgba(239,68,68,0.25);
         }
 
         .actions {
           display: flex;
           gap: 6px;
+          justify-content: center;
         }
 
         .btn-mini {
           padding: 4px 10px;
           border-radius: 999px;
-          background: #1e293b;
-          color: #e2e8f0;
-          border: 1px solid rgba(148,163,184,0.4);
+          background: #eff6ff;
+          color: #1e293b;
+          border: 1px solid rgba(148,163,184,0.7);
           font-size: 12px;
+          cursor: pointer;
+          transition: 0.15s;
         }
 
-        .btn-mini:hover { background: #334155; }
+        .btn-mini:hover {
+          background: #dbeafe;
+          transform: translateY(-1px);
+        }
 
         .btn-mini.danger {
-          background: rgba(248,113,113,0.2);
-          border-color: rgba(248,113,113,0.55);
-          color: #f87171;
+          background: #fef2f2;
+          border-color: rgba(239,68,68,0.6);
+          color: #b91c1c;
         }
 
-        .btn-mini.danger:hover { background: rgba(248,113,113,0.3); }
+        .btn-mini.danger:hover {
+          background: #fee2e2;
+        }
 
         .grid2 {
           display: grid;
@@ -392,41 +590,56 @@ export default function ListaProveedores() {
           gap: 14px;
         }
 
-        @media(max-width:900px){ .grid2 { grid-template-columns:1fr; } }
+        @media (max-width: 900px) {
+          .grid2 { grid-template-columns: 1fr; }
+          .prov-top { flex-direction: column-reverse; align-items: flex-start; }
+          .prov-card-header { flex-direction: column; align-items: flex-start; }
+        }
 
         .field label {
           font-size: 13px;
           font-weight: 600;
-          color: #dbeafe;
+          color: #1f2937;
+          margin-bottom: 4px;
+          display: block;
         }
 
         .field input,
         .field textarea {
           width: 100%;
-          padding: 10px 3px;
+          padding: 10px 8px;
           border-radius: 12px;
-          border: 1px solid rgba(148,163,184,0.4);
-          background: rgba(255,255,255,0.06);
-          color: #f1f5f9;
+          border: 1px solid rgba(148,163,184,0.7);
+          background: #ffffff;
+          color: #111827;
+          outline: none;
+          transition: 0.15s;
         }
 
         .field input:focus,
         .field textarea:focus {
-          border-color: #38bdf8;
-          background: rgba(255,255,255,0.12);
-          box-shadow: 0 0 0 1px rgba(56,189,248,0.4);
+          border-color: #2563eb;
+          box-shadow: 0 0 0 1px rgba(37,99,235,0.3);
         }
 
-        .sub {
-          margin-bottom: 10px;
-          font-size: 20px;
-          font-weight: 600;
-          color: #c7d2fe;
+        .field.check {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 24px;
         }
 
-        .msg { margin-top: 10px; color: #4ade80; }
-        .muted { color:#94a3b8; }
-        .error { color:#f87171; font-weight:600; }
+        .field.check input {
+          width: auto;
+        }
+
+        .msg {
+          margin-top: 10px;
+          color: #15803d;
+          font-size: 14px;
+        }
+        .muted { color:#64748b; font-size: 14px; }
+        .error { color:#b91c1c; font-weight:600; font-size: 14px; }
       `}</style>
     </>
   );
